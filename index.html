@@ -570,21 +570,17 @@ body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjus
         <div id="rolesPane" class="pp-settings-pane">
   <div class="pp-settings-box">
     <h3>Users &amp; Roles</h3>
-    <p>Management can create a Firebase login and assign its People Performance role here.</p>
+    <p>Assign People Performance access to users that already exist in Firebase Authentication. No password is created or stored in this dashboard.</p>
 
-    <div id="addUserPanel" class="pp-upload-panel" style="margin:14px 0 18px">
+    <div class="pp-upload-panel" style="margin:14px 0 18px">
       <div class="pp-toolbar" style="margin-bottom:0">
         <div class="pp-field">
           <label>Email</label>
-          <input id="newUserEmail" type="email" placeholder="name@company.com">
-        </div>
-        <div class="pp-field">
-          <label>Temporary Password</label>
-          <input id="newUserPassword" type="password" placeholder="Minimum 6 characters">
+          <input id="newRoleEmail" type="email" placeholder="name@company.com">
         </div>
         <div class="pp-field">
           <label>Role</label>
-          <select id="newUserRole">
+          <select id="newRoleType">
             <option value="viewer">Viewer</option>
             <option value="planner">Planner</option>
             <option value="supervisor">Supervisor</option>
@@ -593,20 +589,21 @@ body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjus
         </div>
         <div class="pp-field" style="justify-content:end">
           <label>&nbsp;</label>
-          <button id="addUserBtn" class="pp-btn primary">Add User</button>
+          <button id="addRoleBtn" class="pp-btn primary">Add / Update</button>
         </div>
       </div>
-      <div id="addUserStatus" class="pp-status" style="margin-top:10px"></div>
-      <div style="margin-top:10px;color:var(--text-muted);font-size:11px">
-        Viewer: Dashboard + filters + Print/Export only. No Upload, Upload History, Settings or User Management.
-      </div>
+      <div id="roleStatus" class="pp-status" style="margin-top:10px"></div>
     </div>
 
     <div class="pp-table-card">
       <table>
-        <thead><tr><th>Email</th><th>UID</th><th>Role</th><th>Updated</th></tr></thead>
+        <thead><tr><th>Email</th><th>Role</th><th>Access</th><th></th></tr></thead>
         <tbody id="rolesBody"></tbody>
       </table>
+    </div>
+
+    <div style="margin-top:12px;color:var(--text-muted);font-size:11px">
+      Add an entry here for every email that should be able to log in. Anyone who signs in through Firebase Authentication without a matching role entry here will be signed out automatically.
     </div>
   </div>
 </div>
@@ -650,7 +647,7 @@ document.querySelectorAll('.sidebar-btn[data-view]').forEach(b=>b.onclick=()=>{
   showView(id);
 });
 $('settingsTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.pp-settings-pane').forEach(p=>p.classList.toggle('active',p.id===b.dataset.pane));$('settingsTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));if(b.dataset.pane==='kpiPane')renderKpiSettings();if(b.dataset.pane==='plannerPane')renderPlannerRegistry();if(b.dataset.pane==='rolesPane')renderRoles();});
-$('addUserBtn').onclick=createPlatformUser;
+$('addRoleBtn').onclick=addOrUpdateEmailRole;
 
 $('printBtn').onclick=e=>{e.stopPropagation();$('printMenu').style.display=$('printMenu').style.display==='none'?'block':'none';};
 document.addEventListener('click',()=>{$('printMenu').style.display='none'});
@@ -718,9 +715,80 @@ $('loginBtn').onclick=async()=>{try{$('loginError').textContent='';await auth.si
 $('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click();});
 $('signOutBtn').onclick=()=>auth.signOut();
 
-auth.onAuthStateChanged(async user=>{CURRENT_USER=user;if(!user){$('loginView').style.display='flex';$('appView').style.display='none';return;}$('loginView').style.display='none';$('appView').style.display='flex';$('userLabel').textContent=user.email||user.uid;await ensureUserProfile();applyRoleAccess();await loadEverything();buildTerminalPills();buildPeriodTabs();renderDashboard();});
+auth.onAuthStateChanged(async user=>{
+  CURRENT_USER=user;
 
-async function ensureUserProfile(){const ref=db.collection('peopleUsers').doc(CURRENT_USER.uid);const snap=await ref.get();if(snap.exists){CURRENT_ROLE=snap.data().role||'viewer';return;}const users=await db.collection('peopleUsers').limit(1).get();CURRENT_ROLE=users.empty?'management':'viewer';await ref.set({email:CURRENT_USER.email||'',role:CURRENT_ROLE,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}
+  if(!user){
+    $('loginView').style.display='flex';
+    $('appView').style.display='none';
+    return;
+  }
+
+  try{
+    const allowed=await loadRoleForSignedInUser();
+    if(!allowed)return;
+
+    $('loginView').style.display='none';
+    $('appView').style.display='flex';
+    $('userLabel').textContent=user.email||user.uid;
+
+    applyRoleAccess();
+    await loadEverything();
+    buildTerminalPills();
+    buildPeriodTabs();
+    renderDashboard();
+  }catch(e){
+    console.error(e);
+    $('loginError').textContent='Access check failed: '+(e.message||e);
+    await auth.signOut();
+  }
+});
+
+async function loadRoleForSignedInUser(){
+  const email=String(CURRENT_USER&&CURRENT_USER.email||'').trim().toLowerCase();
+
+  if(!email){
+    $('loginError').textContent='This Firebase Authentication account has no email address.';
+    await auth.signOut();
+    return false;
+  }
+
+  const roleRef=db.collection('peopleRoles').doc(email);
+  const roleSnap=await roleRef.get();
+
+  if(roleSnap.exists){
+    CURRENT_ROLE=roleSnap.data().role||'viewer';
+    return true;
+  }
+
+  // One-time migration of the current management account from the earlier UID model.
+  const legacy=await db.collection('peopleUsers').doc(CURRENT_USER.uid).get();
+  if(legacy.exists){
+    CURRENT_ROLE=(legacy.data()||{}).role||'viewer';
+    await roleRef.set({
+      role:CURRENT_ROLE,
+      migratedFromUid:CURRENT_USER.uid,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+    return true;
+  }
+
+  // First clean role entry becomes management only if no role registry exists yet.
+  const anyRoles=await db.collection('peopleRoles').limit(1).get();
+  if(anyRoles.empty){
+    CURRENT_ROLE='management';
+    await roleRef.set({
+      role:'management',
+      bootstrap:true,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  }
+
+  $('loginError').textContent='Your Firebase login is valid, but this email has no People Performance role.';
+  await auth.signOut();
+  return false;
+}
 
 function applyRoleAccess(){
   const management=CURRENT_ROLE==='management';
@@ -1172,65 +1240,104 @@ window.savePlannerName=async id=>{const input=document.getElementById('plannerNa
 async function renderRoles(){
   if(CURRENT_ROLE!=='management'){
     $('rolesBody').innerHTML='<tr><td colspan="4">Management access required.</td></tr>';
-    if($('addUserPanel'))$('addUserPanel').style.display='none';
     return;
   }
-  if($('addUserPanel'))$('addUserPanel').style.display='';
-  const snap=await db.collection('peopleUsers').get();
-  const rows=[];
-  snap.forEach(d=>rows.push({uid:d.id,...d.data()}));
-  rows.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
-  $('rolesBody').innerHTML=rows.length?rows.map(u=>`<tr>
-    <td>${esc(u.email||'')}</td>
-    <td style="font:10px var(--mono)">${esc(u.uid)}</td>
-    <td><select id="role_${u.uid}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px" onchange="saveRole('${u.uid}',this.value)">
-      ${['management','supervisor','planner','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
-    </select></td>
-    <td>${u.updatedAt&&u.updatedAt.toDate?u.updatedAt.toDate().toLocaleString():'–'}</td>
-  </tr>`).join(''):'<tr><td colspan="4">No users registered.</td></tr>';
-}
-window.saveRole=async(uid,role)=>{
-  if(CURRENT_ROLE!=='management'){alert('Only management can change roles.');renderRoles();return;}
-  await db.collection('peopleUsers').doc(uid).set({role,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-  $('sidebarStatus').textContent='Role updated';
-};
 
-async function createPlatformUser(){
-  if(CURRENT_ROLE!=='management'){alert('Only management can add users.');return;}
-  const email=$('newUserEmail').value.trim();
-  const password=$('newUserPassword').value;
-  const role=$('newUserRole').value;
-  const status=$('addUserStatus');
-  if(!email){status.textContent='Enter the user email.';status.className='pp-status err';return;}
-  if(!password||password.length<6){status.textContent='Temporary password must be at least 6 characters.';status.className='pp-status err';return;}
-  status.textContent='Creating user…';status.className='pp-status';
-  let secondary=null;
+  const snap=await db.collection('peopleRoles').get();
+  const rows=[];
+  snap.forEach(d=>rows.push({email:d.id,...d.data()}));
+  rows.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
+
+  $('rolesBody').innerHTML=rows.length?rows.map(u=>{
+    const access=
+      u.role==='viewer' ? 'Dashboard + filters + Print/Export' :
+      u.role==='planner' ? 'Dashboard' :
+      u.role==='supervisor' ? 'Dashboard + Regions' :
+      'Full platform access';
+
+    return `<tr>
+      <td>${esc(u.email||'')}</td>
+      <td>
+        <select style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px"
+          onchange="saveEmailRole('${esc(u.email)}',this.value)">
+          ${['management','supervisor','planner','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </td>
+      <td>${esc(access)}</td>
+      <td><button class="pp-btn danger" onclick="deleteEmailRole('${esc(u.email)}')">Remove</button></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="4">No roles set up yet.</td></tr>';
+}
+
+async function addOrUpdateEmailRole(){
+  if(CURRENT_ROLE!=='management'){
+    alert('Only management can manage roles.');
+    return;
+  }
+
+  const email=String($('newRoleEmail').value||'').trim().toLowerCase();
+  const role=$('newRoleType').value;
+  const status=$('roleStatus');
+
+  if(!email||!email.includes('@')){
+    status.textContent='Enter a valid email address.';
+    status.className='pp-status err';
+    return;
+  }
+
   try{
-    const secondaryName='peopleUserCreator';
-    try{secondary=firebase.app(secondaryName);}catch(e){secondary=firebase.initializeApp(firebaseConfig,secondaryName);}
-    const cred=await secondary.auth().createUserWithEmailAndPassword(email,password);
-    const uid=cred.user.uid;
-    await db.collection('peopleUsers').doc(uid).set({
-      email,
+    await db.collection('peopleRoles').doc(email).set({
       role,
-      createdBy:CURRENT_USER.email||CURRENT_USER.uid,
-      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy:CURRENT_USER.email||CURRENT_USER.uid,
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true});
-    await secondary.auth().signOut();
-    $('newUserEmail').value='';
-    $('newUserPassword').value='';
-    $('newUserRole').value='viewer';
-    status.textContent=`✓ User created and assigned ${role} role.`;
+
+    $('newRoleEmail').value='';
+    $('newRoleType').value='viewer';
+    status.textContent=`✓ ${email} assigned ${role} access.`;
     status.className='pp-status ok';
     await renderRoles();
   }catch(e){
     console.error(e);
-    status.textContent='User creation failed: '+String(e.message||e).replace('Firebase: ','');
+    status.textContent='Could not save role: '+(e.message||e);
     status.className='pp-status err';
-    try{if(secondary)await secondary.auth().signOut();}catch(_){}
   }
 }
+
+window.saveEmailRole=async(email,role)=>{
+  if(CURRENT_ROLE!=='management'){
+    alert('Only management can change roles.');
+    return;
+  }
+
+  await db.collection('peopleRoles').doc(String(email).toLowerCase()).set({
+    role,
+    updatedBy:CURRENT_USER.email||CURRENT_USER.uid,
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+  },{merge:true});
+
+  $('sidebarStatus').textContent='Role updated';
+  await renderRoles();
+};
+
+window.deleteEmailRole=async(email)=>{
+  if(CURRENT_ROLE!=='management'){
+    alert('Only management can remove roles.');
+    return;
+  }
+
+  const normalized=String(email||'').trim().toLowerCase();
+
+  if(normalized===String(CURRENT_USER.email||'').trim().toLowerCase()){
+    alert('You cannot remove your own active management access.');
+    return;
+  }
+
+  if(!confirm(`Remove platform access for ${normalized}?`))return;
+
+  await db.collection('peopleRoles').doc(normalized).delete();
+  await renderRoles();
+};
 
 </script>
 </body></html>
