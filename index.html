@@ -433,6 +433,24 @@ body.pp-exporting .ncard{break-inside:avoid;box-shadow:none!important}
 body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 </style>
 
+
+<style>
+.pp-kpi-card .value.good{color:#3ED17E!important}
+.pp-kpi-card .value.watch{color:#F5C518!important}
+.pp-kpi-card .value.bad{color:#F2483D!important}
+.pp-kpi-card .value.neutral{color:var(--text)!important}
+.pp-kpi-card .target-status{
+  font:700 9px var(--mono);
+  letter-spacing:.45px;
+  text-transform:uppercase;
+  margin-top:4px
+}
+.pp-target-good{color:#3ED17E!important}
+.pp-target-watch{color:#F5C518!important}
+.pp-target-bad{color:#F2483D!important}
+.pp-target-neutral{color:var(--text-faint)!important}
+</style>
+
 </head>
 <body>
 <div class="bg-grid"></div>
@@ -669,11 +687,29 @@ function plannerName(pid){const n=PLANNER_REGISTRY[pid]&&PLANNER_REGISTRY[pid].p
 function rebuildPlannerFilter(rows){const sel=$('plannerFilter');const ids=[...new Set(rows.map(r=>norm(r.Planner)).filter(Boolean))].sort();const keep=ids.includes(currentPlanner)?currentPlanner:'ALL';sel.innerHTML='<option value="ALL">All Planners</option>'+ids.map(x=>`<option value="${esc(x)}">${esc(plannerName(x))}</option>`).join('');sel.value=keep;currentPlanner=keep;sel.onchange=()=>{currentPlanner=sel.value;currentPeriod='';renderDashboard();};}
 function rebuildPeriodFilter(rows){const filtered=currentPlanner==='ALL'?rows:rows.filter(r=>norm(r.Planner)===currentPlanner);const keys=[...new Set(filtered.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort();const sel=$('periodFilter');if(!currentPeriod||!keys.includes(currentPeriod))currentPeriod=keys[keys.length-1]||'';sel.innerHTML=keys.slice().reverse().map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('');sel.value=currentPeriod;sel.onchange=()=>{currentPeriod=sel.value;renderDashboardBody();};}
 
-function getKpiValue(kpi,rows){const col=kpi.period_cols&&kpi.period_cols[currentPeriodType];if(!col)return null;const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);if(!vals.length)return null;const method=(kpi.period_agg&&kpi.period_agg[currentPeriodType])||'MAX';return method==='SUM'?vals.reduce((a,b)=>a+b,0):Math.max(...vals);}
+function isLoadPlannedKpi(kpi){return normLow(kpi&&kpi.key)==='load planned';}
+function loadPlannedSum(rows){return rows.reduce((a,r)=>a+(num(r['Load Planned'])||num(r['Load Planned '])||0),0);}
+function loadShareForRows(plannerRows,allPeriodRows){
+  const total=loadPlannedSum(allPeriodRows);
+  if(!total)return null;
+  return loadPlannedSum(plannerRows)/total;
+}
+function getKpiValue(kpi,rows){
+  if(isLoadPlannedKpi(kpi)){
+    const allPeriodRows=getRowsForTerminal().filter(r=>periodKey(r,currentPeriodType)===currentPeriod);
+    return loadShareForRows(rows,allPeriodRows);
+  }
+  const col=kpi.period_cols&&kpi.period_cols[currentPeriodType];
+  if(!col)return null;
+  const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);
+  if(!vals.length)return null;
+  const method=(kpi.period_agg&&kpi.period_agg[currentPeriodType])||'MAX';
+  return method==='SUM'?vals.reduce((a,b)=>a+b,0):Math.max(...vals);
+}
 function rowYear(r){const d=parseExcelDate(r&&r.ETB);return String(norm(r&&r.Year)||(d?d.getUTCFullYear():''));}
 function kpiOverride(kpi,rows,field){if(!rows||!rows.length)return null;const years=[...new Set(rows.map(rowYear).filter(Boolean))];if(years.length!==1)return null;const term=norm(rows[0].Terminal)||currentTerminal;const item=KPI_SETTINGS[term]&&KPI_SETTINGS[term][years[0]]&&KPI_SETTINGS[term][years[0]][kpi.key];const v=item?num(item[field]):null;return v;}
-function targetFor(kpi,rows){const ov=kpiOverride(kpi,rows,'target');if(ov!==null)return ov;if(!kpi.target_col)return null;const vals=rows.map(r=>num(r[kpi.target_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
-function weightFor(kpi,rows){const ov=kpiOverride(kpi,rows,'weight');if(ov!==null)return ov;if(!kpi.weight_col)return null;const vals=rows.map(r=>num(r[kpi.weight_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
+function targetFor(kpi,rows){const ov=kpiOverride(kpi,rows,'target');if(ov!==null)return ov;if(isLoadPlannedKpi(kpi))return null;if(!kpi.target_col)return null;const vals=rows.map(r=>num(r[kpi.target_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
+function weightFor(kpi,rows){const ov=kpiOverride(kpi,rows,'weight');if(ov!==null)return ov;if(isLoadPlannedKpi(kpi))return null;if(!kpi.weight_col)return null;const vals=rows.map(r=>num(r[kpi.weight_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
 
 function renderDashboard(){buildTerminalPills();buildPeriodTabs();const rows=getRowsForTerminal();const flag=$('brandFlag');if(ASSETS.flags[currentTerminal]){flag.src=ASSETS.flags[currentTerminal];flag.style.display='inline-block'}else flag.style.display='none';$('brandTitle').textContent=`${currentTerminal} Planner Performance`;$('brandSubtitle').textContent=`People Performance Management — Tangier · ${PERIOD_LABEL[currentPeriodType]} View`;rebuildPlannerFilter(rows);rebuildPeriodFilter(rows);renderDashboardBody();}
 function renderDashboardBody(){
@@ -718,35 +754,186 @@ function renderDashboardBody(){
   const dis=sum(filtered,'Total Discharge Planned');
   host.innerHTML=`<div class="pp-gauge-grid"><div class="pp-gauge"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score</div><canvas id="plannerGauge"></canvas></div><div class="pp-trend"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score Trend</div><canvas id="plannerTrend"></canvas></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} Volume</div><div class="pp-volume-grid"><div class="pp-volume"><div class="label">Total Moves Planned</div><div class="value">${fmt(moves,false,0)}</div></div><div class="pp-volume"><div class="label">Load Planned</div><div class="value">${fmt(load,false,0)}</div></div><div class="pp-volume"><div class="label">Discharge Planned</div><div class="value">${fmt(dis,false,0)}</div></div><div class="pp-volume"><div class="label">Vessel Calls</div><div class="value">${calls}</div></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} KPI Scorecard</div><div class="pp-summary-grid" id="kpiCards"></div><div class="pp-section-label">KPI Trends</div><div class="pp-kpi-trend-grid" id="kpiTrendGrid"></div><div class="pp-section-label">Planner Vessel Detail</div><div class="pp-table-card"><table><thead><tr><th>Planner</th><th>Vessel Visit</th><th>Vessel Name</th><th>ETB</th><th>Total Moves</th><th>Planner Score</th></tr></thead><tbody>${filtered.slice().sort((a,b)=>String(a.ETB).localeCompare(String(b.ETB))).map(r=>`<tr><td>${esc(plannerName(norm(r.Planner)))}</td><td>${esc(r['Id visit'])}</td><td>${esc(r['Vessel Name'])}</td><td>${esc(shortDate(r.ETB))}</td><td>${fmt(num(r['Total Moves Planned '])??num(r['Total Moves Planned']),false,0)}</td><td>${fmt(r['Planner Score'],false,2)}</td></tr>`).join('')}</tbody></table></div>`;
   const cards=$('kpiCards');
-  catalog.filter(k=>normLow(k.key)!=='planner score').forEach(k=>{const value=getKpiValue(k,filtered),target=targetFor(k,filtered),weight=weightFor(k,filtered),agg=(k.period_agg&&k.period_agg[currentPeriodType])||'MAX';const el=document.createElement('div');el.className='pp-kpi-card';el.innerHTML=`<div class="label">${esc(k.key)}</div><div class="value">${fmt(value,k.isPercent,2)}</div><div class="target">Target ${fmt(target,k.isPercent,2)}${weight!==null?` · Weight ${fmt(weight,true,1)}`:''}</div><div class="agg">${esc(agg)}</div>`;cards.appendChild(el);});
+  catalog.filter(k=>normLow(k.key)!=='planner score').forEach(k=>{
+    const value=getKpiValue(k,filtered);
+    const target=targetFor(k,filtered);
+    const weight=weightFor(k,filtered);
+    const displayPct=isLoadPlannedKpi(k)||k.isPercent;
+    const st=ppTargetStatus(k,value,target);
+    const el=document.createElement('div');
+    el.className='pp-kpi-card';
+    const targetLine=target!==null
+      ? `Target ${fmt(target,displayPct,2)}${weight!==null?` · Weight ${fmt(weight,true,1)}`:''}`
+      : (isLoadPlannedKpi(k)?'Share of terminal load in selected period':'Target –');
+    el.innerHTML=`<div class="label">${esc(k.key)}</div>
+      <div class="value ${st}">${fmt(value,displayPct,2)}</div>
+      <div class="target">${targetLine}</div>
+      ${target!==null?`<div class="target-status pp-target-${st}">${ppStatusLabel(st)}</div>`:''}`;
+    cards.appendChild(el);
+  });
   renderCharts(scoreKpi,filtered,score,scoreTarget);
   renderKpiTrends(catalog.filter(k=>normLow(k.key)!=='planner score'),filtered);
   $('lastUpdated').textContent=`${filtered.length.toLocaleString()} rows · ${esc(plannerName(currentPlanner))}`;
 }
 function chartColors(){const cs=getComputedStyle(document.documentElement);return {text:cs.getPropertyValue('--text-muted').trim()||'#7E9AA8',grid:cs.getPropertyValue('--border-soft').trim()||'#173241',teal:cs.getPropertyValue('--teal').trim()||'#3ED17E',panel:cs.getPropertyValue('--panel-2').trim()||'#122B38'};}
-function renderCharts(scoreKpi,curRows,score,scoreTarget){if(!document.getElementById('plannerGauge'))return;const c=chartColors();if(gaugeChart)gaugeChart.destroy();const max=scoreTarget&&scoreTarget>0?Math.max(scoreTarget*1.25,5):5;const sv=Math.max(0,Math.min(max,num(score)||0));gaugeChart=new Chart($('plannerGauge'),{type:'doughnut',data:{datasets:[{data:[sv,Math.max(0,max-sv)],backgroundColor:[c.teal,c.panel],borderWidth:0,circumference:180,rotation:270}]},options:{responsive:true,maintainAspectRatio:false,cutout:'76%',plugins:{legend:{display:false},tooltip:{enabled:false}}},plugins:[{id:'centerText',afterDraw(ch){const {ctx,chartArea:{left,right,bottom}}=ch;ctx.save();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text').trim();ctx.font='700 25px Space Grotesk';ctx.textAlign='center';ctx.fillText(fmt(score,false,2),(left+right)/2,bottom-28);ctx.fillStyle=c.text;ctx.font='10px IBM Plex Mono';ctx.fillText(`target ${fmt(scoreTarget,false,2)}`,(left+right)/2,bottom-8);ctx.restore();}}]});if(trendChart)trendChart.destroy();const baseRows=getRowsForTerminal().filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);const keys=[...new Set(baseRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);const vals=keys.map(k=>{const rs=baseRows.filter(r=>periodKey(r,currentPeriodType)===k);return scoreKpi?getKpiValueForPeriod(scoreKpi,rs,currentPeriodType):null;});trendChart=new Chart($('plannerTrend'),{type:'line',data:{labels:keys,datasets:[{data:vals,borderColor:c.teal,backgroundColor:c.teal+'20',fill:true,tension:.3,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:c.text,maxTicksLimit:8},grid:{color:c.grid}},y:{ticks:{color:c.text},grid:{color:c.grid}}}}});}
-function getKpiValueForPeriod(kpi,rows,type){const col=kpi.period_cols&&kpi.period_cols[type];if(!col)return null;const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);if(!vals.length)return null;return ((kpi.period_agg&&kpi.period_agg[type])==='SUM')?vals.reduce((a,b)=>a+b,0):Math.max(...vals);}
+const PP_STATUS_COLOR={good:'#3ED17E',watch:'#F5C518',bad:'#F2483D',neutral:'#7E9AA8'};
+const PP_LOWER_BETTER=new Set(['re-handles','rehandles','yard clashes','loading points','planning turnaround time (h)','average traveling distance']);
+function ppKpiDirection(kpi){
+  const n=normLow(kpi&&kpi.key||'');
+  return PP_LOWER_BETTER.has(n)?'lower':'higher';
+}
+function ppTargetStatus(kpi,value,target){
+  value=num(value);target=num(target);
+  if(value===null||target===null||target===0)return 'neutral';
+  if(ppKpiDirection(kpi)==='lower'){
+    if(value<=target)return 'good';
+    if(value<=target*1.15)return 'watch';
+    return 'bad';
+  }
+  if(value>=target)return 'good';
+  if(value>=target*0.85)return 'watch';
+  return 'bad';
+}
+function ppStatusLabel(st){return st==='good'?'On target':st==='watch'?'Watch':st==='bad'?'Below target':'No target';}
+function ppChartLabel(kpi,v){
+  const pct=isLoadPlannedKpi(kpi)||!!(kpi&&kpi.isPercent);
+  return fmt(v,pct,2);
+}
+function ppLineValueLabelPlugin(kpi){
+  return {
+    id:'ppLabels_'+Math.random().toString(36).slice(2),
+    afterDatasetsDraw(chart){
+      const {ctx,chartArea}=chart;
+      if(!chartArea)return;
+      chart.data.datasets.forEach((ds,di)=>{
+        if(ds.ppTargetLine)return;
+        const meta=chart.getDatasetMeta(di);
+        if(meta.hidden)return;
+        ctx.save();
+        ctx.font='600 9px IBM Plex Mono';
+        ctx.textAlign='center';
+        ctx.textBaseline='bottom';
+        meta.data.forEach((pt,i)=>{
+          const v=ds.data[i];
+          if(v===null||v===undefined||!Number.isFinite(Number(v)))return;
+          ctx.fillStyle=(ds.pointBackgroundColor&&ds.pointBackgroundColor[i])||getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+          ctx.fillText(ppChartLabel(kpi,v),pt.x,Math.max(chartArea.top+11,pt.y-6));
+        });
+        ctx.restore();
+      });
+    }
+  };
+}
+function renderCharts(scoreKpi,curRows,score,scoreTarget){
+  if(!document.getElementById('plannerGauge'))return;
+  const c=chartColors();
+  const scoreStatus=ppTargetStatus(scoreKpi||{key:'Planner Score'},score,scoreTarget);
+  const scoreColor=PP_STATUS_COLOR[scoreStatus]||c.teal;
+
+  if(gaugeChart)gaugeChart.destroy();
+  const max=scoreTarget&&scoreTarget>0?Math.max(scoreTarget*1.25,5):5;
+  const sv=Math.max(0,Math.min(max,num(score)||0));
+  gaugeChart=new Chart($('plannerGauge'),{
+    type:'doughnut',
+    data:{datasets:[{data:[sv,Math.max(0,max-sv)],backgroundColor:[scoreColor,c.panel],borderWidth:0,circumference:180,rotation:270}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'76%',plugins:{legend:{display:false},tooltip:{enabled:false}}},
+    plugins:[{id:'centerText',afterDraw(ch){
+      const {ctx,chartArea:{left,right,bottom}}=ch;
+      ctx.save();
+      ctx.fillStyle=scoreColor;ctx.font='700 25px Space Grotesk';ctx.textAlign='center';
+      ctx.fillText(fmt(score,false,2),(left+right)/2,bottom-28);
+      ctx.fillStyle=c.text;ctx.font='10px IBM Plex Mono';
+      ctx.fillText(`target ${fmt(scoreTarget,false,2)}`,(left+right)/2,bottom-8);
+      ctx.restore();
+    }}]
+  });
+
+  if(trendChart)trendChart.destroy();
+  const allRows=getRowsForTerminal();
+  const plannerRows=allRows.filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);
+  const keys=[...new Set(plannerRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);
+  const vals=keys.map(key=>{
+    const rs=plannerRows.filter(r=>periodKey(r,currentPeriodType)===key);
+    return scoreKpi?getKpiValueForPeriod(scoreKpi,rs,currentPeriodType,key):null;
+  });
+  const pointColors=vals.map(v=>PP_STATUS_COLOR[ppTargetStatus(scoreKpi||{key:'Planner Score'},v,scoreTarget)]||c.teal);
+  const datasets=[{
+    label:'Planner Score',data:vals,borderColor:pointColors[pointColors.length-1]||c.teal,
+    segment:{borderColor:ctx=>pointColors[ctx.p1DataIndex]||c.teal},
+    backgroundColor:(pointColors[pointColors.length-1]||c.teal)+'18',
+    fill:true,tension:.3,pointRadius:3,
+    pointBackgroundColor:pointColors,pointBorderColor:pointColors
+  }];
+  if(scoreTarget!==null)datasets.push({label:'Target',data:keys.map(()=>scoreTarget),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0,ppTargetLine:true});
+  trendChart=new Chart($('plannerTrend'),{
+    type:'line',data:{labels:keys,datasets},
+    plugins:[ppLineValueLabelPlugin(scoreKpi||{key:'Planner Score',isPercent:false})],
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
+      plugins:{legend:{display:scoreTarget!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},
+      scales:{x:{ticks:{color:c.text,maxTicksLimit:8},grid:{color:c.grid}},y:{ticks:{color:c.text},grid:{color:c.grid}}}}
+  });
+}
+function getKpiValueForPeriod(kpi,rows,type,keyOverride){
+  if(isLoadPlannedKpi(kpi)){
+    const key=keyOverride||(rows[0]?periodKey(rows[0],type):'');
+    const allPeriodRows=getRowsForTerminal().filter(r=>periodKey(r,type)===key);
+    return loadShareForRows(rows,allPeriodRows);
+  }
+  const col=kpi.period_cols&&kpi.period_cols[type];
+  if(!col)return null;
+  const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);
+  if(!vals.length)return null;
+  return ((kpi.period_agg&&kpi.period_agg[type])==='SUM')?vals.reduce((a,b)=>a+b,0):Math.max(...vals);
+}
 function renderKpiTrends(kpis,selectedRows){
   kpiTrendCharts.forEach(ch=>{try{ch.destroy()}catch(e){}});kpiTrendCharts=[];
   const host=$('kpiTrendGrid');if(!host)return;host.innerHTML='';
-  const baseRows=getRowsForTerminal().filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);
-  const keys=[...new Set(baseRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);
+  const allRows=getRowsForTerminal();
+  const plannerRows=allRows.filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);
+  const keys=[...new Set(plannerRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);
   const c=chartColors();
+
   kpis.forEach((k,idx)=>{
-    const vals=keys.map(key=>getKpiValueForPeriod(k,baseRows.filter(r=>periodKey(r,currentPeriodType)===key),currentPeriodType));
+    const vals=keys.map(key=>{
+      const rs=plannerRows.filter(r=>periodKey(r,currentPeriodType)===key);
+      return getKpiValueForPeriod(k,rs,currentPeriodType,key);
+    });
     if(!vals.some(v=>v!==null))return;
+
     const target=targetFor(k,selectedRows);
-    const card=document.createElement('div');card.className='pp-kpi-trend-card';
-    card.innerHTML=`<div class="head"><div class="label">${esc(k.key)}</div><div class="target-note">Target ${fmt(target,k.isPercent,2)}</div></div><canvas id="kpiTrend_${idx}"></canvas>`;
+    const displayPct=isLoadPlannedKpi(k)||k.isPercent;
+    const card=document.createElement('div');
+    card.className='pp-kpi-trend-card';
+    card.innerHTML=`<div class="head"><div class="label">${esc(k.key)}</div><div class="target-note">${target!==null?`Target ${fmt(target,displayPct,2)}`:(isLoadPlannedKpi(k)?'Planner share of terminal load':'Target –')}</div></div><canvas id="kpiTrend_${idx}"></canvas>`;
     host.appendChild(card);
-    const datasets=[{label:k.key,data:vals,borderColor:c.teal,backgroundColor:c.teal+'18',fill:true,tension:.28,pointRadius:2}];
-    if(target!==null)datasets.push({label:'Target',data:keys.map(()=>target),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0});
-    const ch=new Chart(document.getElementById(`kpiTrend_${idx}`),{type:'line',data:{labels:keys,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:target!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},scales:{x:{ticks:{color:c.text,maxTicksLimit:7},grid:{color:c.grid}},y:{ticks:{color:c.text,callback:v=>k.isPercent?`${(Number(v)*100).toFixed(0)}%`:v},grid:{color:c.grid}}}}});
+
+    const pointColors=vals.map(v=>target!==null?(PP_STATUS_COLOR[ppTargetStatus(k,v,target)]||c.teal):c.teal);
+    const datasets=[{
+      label:k.key,data:vals,
+      borderColor:pointColors[pointColors.length-1]||c.teal,
+      segment:{borderColor:ctx=>pointColors[ctx.p1DataIndex]||c.teal},
+      backgroundColor:(pointColors[pointColors.length-1]||c.teal)+'18',
+      fill:true,tension:.28,pointRadius:3,
+      pointBackgroundColor:pointColors,pointBorderColor:pointColors
+    }];
+    if(target!==null)datasets.push({label:'Target',data:keys.map(()=>target),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0,ppTargetLine:true});
+
+    const ch=new Chart(document.getElementById(`kpiTrend_${idx}`),{
+      type:'line',data:{labels:keys,datasets},
+      plugins:[ppLineValueLabelPlugin(k)],
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
+        plugins:{legend:{display:target!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},
+        scales:{
+          x:{ticks:{color:c.text,maxTicksLimit:7},grid:{color:c.grid}},
+          y:{ticks:{color:c.text,callback:v=>displayPct?`${(Number(v)*100).toFixed(0)}%`:v},grid:{color:c.grid}}
+        }
+      }
+    });
     kpiTrendCharts.push(ch);
   });
+
   if(!host.children.length)host.innerHTML='<div class="pp-empty" style="grid-column:1/-1">No trend data available for the selected planner.</div>';
 }
-
 
 function renderRegion(){const host=$('regionTerminalGrid');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const rows=DATA[term]||[],planners=new Set(rows.map(r=>r.Planner)).size;const el=document.createElement('div');el.className='pp-term-card'+(term===currentTerminal?' active':'');el.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}">`:''}<div><div class="code">${term}</div><div class="meta">${rows.length?`${rows.length.toLocaleString()} rows · ${planners} planners`:'No upload yet'}</div></div>`;el.onclick=()=>{currentTerminal=term;currentPeriod='';showView('dashboardView');};host.appendChild(el);});}
 
