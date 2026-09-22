@@ -497,18 +497,18 @@ body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjus
     <div class="sidebar-section">
       <div class="sidebar-section-title">Dashboards</div>
       <button class="sidebar-btn active" data-view="dashboardView">▦ <span>Planner Performance</span></button>
-      <button class="sidebar-btn" data-view="regionView">⚑ <span>Regions</span></button>
+      <button class="sidebar-btn" id="regionsNavBtn" data-view="regionView">⚑ <span>Regions</span></button>
       <div id="printWrap" style="position:relative">
         <button class="sidebar-btn" id="printBtn">🖨 <span>Print / Export</span></button>
         <div id="printMenu" class="print-menu no-print" style="display:none"><button id="printPdfBtn">Save as PDF</button><button id="printImageBtn">Save as Image</button></div>
       </div>
     </div>
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="dataAnalysisNav">
       <div class="sidebar-section-title">Data Analysis</div>
       <button class="sidebar-btn" data-view="uploadView">⬆ <span>Upload Planner Data</span></button>
       <button class="sidebar-btn" data-view="historyView">◷ <span>Upload History</span></button>
     </div>
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="settingsRolesNav">
       <div class="sidebar-section-title">Settings &amp; Roles</div>
       <button class="sidebar-btn" data-view="settingsView">⚙ <span>Settings</span></button>
     </div>
@@ -567,7 +567,49 @@ body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjus
         <div id="regionsPane" class="pp-settings-pane active"><div class="pp-settings-box"><h3>Tangier</h3><p>Only Tangier is configured in this platform. The existing terminal flags from the reference platform are retained.</p><div class="pp-terminal-grid" id="settingsTerminalGrid"></div></div></div>
         <div id="kpiPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>KPI Targets &amp; Aggregation</h3><p>Keep the KPI logic from the uploaded terminal workbook: SUM stays SUM and MAX stays MAX. Targets and weights can be reviewed or overridden by terminal and year without changing planner records.</p><div class="pp-toolbar" style="margin-bottom:12px"><div class="pp-field"><label>Terminal</label><select id="settingsKpiTerminal"></select></div><div class="pp-field"><label>Year</label><select id="settingsKpiYear"></select></div></div><div class="pp-table-card"><table><thead><tr><th>KPI</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Yearly</th><th>Target</th><th>Weight</th><th></th></tr></thead><tbody id="kpiSettingsBody"></tbody></table></div></div></div>
         <div id="plannerPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>Planner Registry</h3><p>Planner IDs are global. A planner can work on multiple terminals; the registry does not assign or restrict a planner to any terminal.</p><div class="pp-table-card"><table><thead><tr><th>Planner ID</th><th>Planner Name</th><th></th></tr></thead><tbody id="plannerRegistryBody"></tbody></table></div></div></div>
-        <div id="rolesPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>Users &amp; Roles</h3><p>Roles are stored in the new People Performance Firebase project. Firestore security can be tightened to these roles after setup.</p><div class="pp-table-card"><table><thead><tr><th>Email</th><th>UID</th><th>Role</th><th>Updated</th></tr></thead><tbody id="rolesBody"></tbody></table></div></div></div>
+        <div id="rolesPane" class="pp-settings-pane">
+  <div class="pp-settings-box">
+    <h3>Users &amp; Roles</h3>
+    <p>Management can create a Firebase login and assign its People Performance role here.</p>
+
+    <div id="addUserPanel" class="pp-upload-panel" style="margin:14px 0 18px">
+      <div class="pp-toolbar" style="margin-bottom:0">
+        <div class="pp-field">
+          <label>Email</label>
+          <input id="newUserEmail" type="email" placeholder="name@company.com">
+        </div>
+        <div class="pp-field">
+          <label>Temporary Password</label>
+          <input id="newUserPassword" type="password" placeholder="Minimum 6 characters">
+        </div>
+        <div class="pp-field">
+          <label>Role</label>
+          <select id="newUserRole">
+            <option value="viewer">Viewer</option>
+            <option value="planner">Planner</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="management">Management</option>
+          </select>
+        </div>
+        <div class="pp-field" style="justify-content:end">
+          <label>&nbsp;</label>
+          <button id="addUserBtn" class="pp-btn primary">Add User</button>
+        </div>
+      </div>
+      <div id="addUserStatus" class="pp-status" style="margin-top:10px"></div>
+      <div style="margin-top:10px;color:var(--text-muted);font-size:11px">
+        Viewer: Dashboard + filters + Print/Export only. No Upload, Upload History, Settings or User Management.
+      </div>
+    </div>
+
+    <div class="pp-table-card">
+      <table>
+        <thead><tr><th>Email</th><th>UID</th><th>Role</th><th>Updated</th></tr></thead>
+        <tbody id="rolesBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
       </section>
     </div>
   </main>
@@ -602,8 +644,13 @@ $('themeToggleBtn').onclick=()=>setTheme(document.documentElement.getAttribute('
 $('loginLogo').src=ASSETS.logo||'';$('brandLogo').src=ASSETS.logo||'';
 
 function showView(id){document.querySelectorAll('.pp-view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.sidebar-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));if(id==='dashboardView')renderDashboard();if(id==='regionView')renderRegion();if(id==='historyView')renderHistory();if(id==='settingsView')renderSettings();}
-document.querySelectorAll('.sidebar-btn[data-view]').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+document.querySelectorAll('.sidebar-btn[data-view]').forEach(b=>b.onclick=()=>{
+  const id=b.dataset.view;
+  if(!canOpenView(id)){showView('dashboardView');return;}
+  showView(id);
+});
 $('settingsTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.pp-settings-pane').forEach(p=>p.classList.toggle('active',p.id===b.dataset.pane));$('settingsTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));if(b.dataset.pane==='kpiPane')renderKpiSettings();if(b.dataset.pane==='plannerPane')renderPlannerRegistry();if(b.dataset.pane==='rolesPane')renderRoles();});
+$('addUserBtn').onclick=createPlatformUser;
 
 $('printBtn').onclick=e=>{e.stopPropagation();$('printMenu').style.display=$('printMenu').style.display==='none'?'block':'none';};
 document.addEventListener('click',()=>{$('printMenu').style.display='none'});
@@ -671,9 +718,45 @@ $('loginBtn').onclick=async()=>{try{$('loginError').textContent='';await auth.si
 $('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click();});
 $('signOutBtn').onclick=()=>auth.signOut();
 
-auth.onAuthStateChanged(async user=>{CURRENT_USER=user;if(!user){$('loginView').style.display='flex';$('appView').style.display='none';return;}$('loginView').style.display='none';$('appView').style.display='flex';$('userLabel').textContent=user.email||user.uid;await ensureUserProfile();await loadEverything();buildTerminalPills();buildPeriodTabs();renderDashboard();});
+auth.onAuthStateChanged(async user=>{CURRENT_USER=user;if(!user){$('loginView').style.display='flex';$('appView').style.display='none';return;}$('loginView').style.display='none';$('appView').style.display='flex';$('userLabel').textContent=user.email||user.uid;await ensureUserProfile();applyRoleAccess();await loadEverything();buildTerminalPills();buildPeriodTabs();renderDashboard();});
 
 async function ensureUserProfile(){const ref=db.collection('peopleUsers').doc(CURRENT_USER.uid);const snap=await ref.get();if(snap.exists){CURRENT_ROLE=snap.data().role||'viewer';return;}const users=await db.collection('peopleUsers').limit(1).get();CURRENT_ROLE=users.empty?'management':'viewer';await ref.set({email:CURRENT_USER.email||'',role:CURRENT_ROLE,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}
+
+function applyRoleAccess(){
+  const management=CURRENT_ROLE==='management';
+  const viewer=CURRENT_ROLE==='viewer';
+  const planner=CURRENT_ROLE==='planner';
+  const supervisor=CURRENT_ROLE==='supervisor';
+
+  // Management = full platform.
+  if($('dataAnalysisNav')) $('dataAnalysisNav').style.display=management?'':'none';
+  if($('settingsRolesNav')) $('settingsRolesNav').style.display=management?'':'none';
+
+  // Viewer is intentionally dashboard-only.
+  if($('regionsNavBtn')) $('regionsNavBtn').style.display=management||supervisor?'':'none';
+
+  // Planner remains read-only dashboard access until planner-specific access rules are provided.
+  // Supervisor remains read-only dashboard/regions access until additional rules are provided.
+  if(viewer||planner){
+    if(document.querySelector('.sidebar-btn[data-view="dashboardView"]')){
+      document.querySelector('.sidebar-btn[data-view="dashboardView"]').style.display='';
+    }
+  }
+
+  // If a non-management account somehow lands on a restricted view, return it to dashboard.
+  const active=document.querySelector('.pp-view.active');
+  if(!management && active && ['uploadView','historyView','settingsView'].includes(active.id)){
+    showView('dashboardView');
+  }
+}
+
+function canOpenView(id){
+  if(CURRENT_ROLE==='management')return true;
+  if(id==='dashboardView')return true;
+  if(id==='regionView')return CURRENT_ROLE==='supervisor';
+  return false;
+}
+
 
 async function loadEverything(){DATA={};CATALOG={};PLANNER_REGISTRY={};UPLOAD_HISTORY=[];KPI_SETTINGS={};$('sidebarStatus').textContent='Loading…';try{const knownSnap=await db.collection('peopleMeta').doc('knownTerminals').get();const loaded=(knownSnap.exists&&Array.isArray(knownSnap.data().terminals))?knownSnap.data().terminals:[];for(const term of loaded){await loadTerminal(term);}const reg=await db.collection('peoplePlannerRegistry').get();reg.forEach(d=>PLANNER_REGISTRY[d.id]=d.data());const ks=await db.collection('peopleKpiSettings').get();ks.forEach(d=>{const x=d.data()||{};if(x.terminal&&x.year){KPI_SETTINGS[x.terminal]=KPI_SETTINGS[x.terminal]||{};KPI_SETTINGS[x.terminal][String(x.year)]=x.settings||{};}});const hist=await db.collection('peopleUploads').orderBy('uploadedAt','desc').limit(100).get();hist.forEach(d=>UPLOAD_HISTORY.push({id:d.id,...d.data()}));$('sidebarStatus').textContent=`${loaded.length} terminal${loaded.length===1?'':'s'} loaded`;const first=loaded.includes(currentTerminal)?currentTerminal:(loaded[0]||currentTerminal);currentTerminal=first;}catch(e){console.error(e);$('sidebarStatus').textContent='Data load issue';}}
 
@@ -795,7 +878,7 @@ function renderDashboardBody(){
       el.innerHTML=`<div class="label">${esc(k.key)}</div>
         <div class="load-share-line">
           <div class="value neutral">${fmt(value,true,2)}</div>
-          <div class="load-amount">${fmt(plannerLoad,false,0)} moves</div>
+          <div class="load-amount">${fmt(plannerLoad,false,0)} Load Moves</div>
         </div>
         <div class="target">Share of terminal load in selected period</div>`;
     }else{
@@ -837,7 +920,8 @@ function ppChartLabel(kpi,v){
   const pct=isLoadPlannedKpi(kpi)||!!(kpi&&kpi.isPercent);
   return fmt(v,pct,2);
 }
-function ppLineValueLabelPlugin(kpi){
+function ppLineValueLabelPlugin(kpi, options={}){
+  const valueFormatter=options.valueFormatter||null;
   return {
     id:'ppLabels_'+Math.random().toString(36).slice(2),
     afterDatasetsDraw(chart){
@@ -848,20 +932,16 @@ function ppLineValueLabelPlugin(kpi){
         const meta=chart.getDatasetMeta(di);
         if(meta.hidden)return;
         ctx.save();
-        ctx.font='700 11px IBM Plex Mono';
+        ctx.font='600 9px IBM Plex Mono';
         ctx.textAlign='center';
         ctx.textBaseline='bottom';
         ctx.fillStyle='#FFFFFF';
-        ctx.strokeStyle='rgba(0,0,0,.82)';
-        ctx.lineWidth=3;
-        ctx.lineJoin='round';
         meta.data.forEach((pt,i)=>{
           const v=ds.data[i];
           if(v===null||v===undefined||!Number.isFinite(Number(v)))return;
-          const txt=ppChartLabel(kpi,v);
-          const x=Math.max(chartArea.left+24,Math.min(chartArea.right-24,pt.x));
-          const y=Math.max(chartArea.top+18,pt.y-10);
-          ctx.strokeText(txt,x,y);
+          const txt=valueFormatter?valueFormatter(v):ppChartLabel(kpi,v);
+          const x=Math.max(chartArea.left+18,Math.min(chartArea.right-18,pt.x));
+          const y=Math.max(chartArea.top+12,pt.y-6);
           ctx.fillText(txt,x,y);
         });
         ctx.restore();
@@ -933,51 +1013,139 @@ function getKpiValueForPeriod(kpi,rows,type,keyOverride){
 function renderKpiTrends(kpis,selectedRows){
   kpiTrendCharts.forEach(ch=>{try{ch.destroy()}catch(e){}});kpiTrendCharts=[];
   const host=$('kpiTrendGrid');if(!host)return;host.innerHTML='';
+
   const allRows=getRowsForTerminal();
   const plannerRows=allRows.filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);
   const keys=[...new Set(plannerRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);
   const c=chartColors();
 
-  kpis.forEach((k,idx)=>{
-    const vals=keys.map(key=>{
-      const rs=plannerRows.filter(r=>periodKey(r,currentPeriodType)===key);
-      return getKpiValueForPeriod(k,rs,currentPeriodType,key);
-    });
+  const addTrendCard=({title,note,vals,target=null,kpi=null,isPercent=false,valueFormatter=null})=>{
     if(!vals.some(v=>v!==null))return;
 
-    const target=targetFor(k,selectedRows);
-    const displayPct=isLoadPlannedKpi(k)||k.isPercent;
     const card=document.createElement('div');
     card.className='pp-kpi-trend-card';
-    card.innerHTML=`<div class="head"><div class="label">${esc(k.key)}</div><div class="target-note">${target!==null?`Target ${fmt(target,displayPct,2)}`:(isLoadPlannedKpi(k)?'Planner share of terminal load':'Target –')}</div></div><canvas id="kpiTrend_${idx}"></canvas>`;
+    const canvasId='kpiTrend_'+kpiTrendCharts.length+'_'+Math.random().toString(36).slice(2,7);
+    card.innerHTML=`<div class="head">
+      <div class="label">${esc(title)}</div>
+      <div class="target-note">${note||''}</div>
+    </div><canvas id="${canvasId}"></canvas>`;
     host.appendChild(card);
 
-    const pointColors=vals.map(v=>target!==null?(PP_STATUS_COLOR[ppTargetStatus(k,v,target)]||c.teal):c.teal);
+    const pointColors=vals.map(v=>{
+      if(target===null||!kpi)return c.teal;
+      return PP_STATUS_COLOR[ppTargetStatus(kpi,v,target)]||c.teal;
+    });
+
     const datasets=[{
-      label:k.key,data:vals,
+      label:title,
+      data:vals,
       borderColor:pointColors[pointColors.length-1]||c.teal,
       segment:{borderColor:ctx=>pointColors[ctx.p1DataIndex]||c.teal},
       backgroundColor:(pointColors[pointColors.length-1]||c.teal)+'18',
-      fill:true,tension:.28,borderWidth:3,pointRadius:5,pointHoverRadius:7,
-      pointBackgroundColor:pointColors,pointBorderColor:pointColors
+      fill:true,
+      tension:.28,
+      borderWidth:2,
+      pointRadius:3,
+      pointHoverRadius:5,
+      pointBackgroundColor:pointColors,
+      pointBorderColor:pointColors
     }];
-    if(target!==null)datasets.push({label:'Target',data:keys.map(()=>target),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0,ppTargetLine:true});
 
-    const ch=new Chart(document.getElementById(`kpiTrend_${idx}`),{
-      type:'line',data:{labels:keys,datasets},
-      plugins:[ppLineValueLabelPlugin(k)],
-      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
-        plugins:{legend:{display:target!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},
+    if(target!==null){
+      datasets.push({
+        label:'Target',
+        data:keys.map(()=>target),
+        borderColor:'#F5C518',
+        borderDash:[5,4],
+        pointRadius:0,
+        fill:false,
+        tension:0,
+        ppTargetLine:true
+      });
+    }
+
+    const chartKpi=kpi||{key:title,isPercent};
+    const ch=new Chart(document.getElementById(canvasId),{
+      type:'line',
+      data:{labels:keys,datasets},
+      plugins:[ppLineValueLabelPlugin(chartKpi,{valueFormatter})],
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        layout:{padding:{top:16}},
+        plugins:{
+          legend:{
+            display:target!==null,
+            labels:{color:c.text,boxWidth:10,font:{size:9}}
+          }
+        },
         scales:{
-          x:{ticks:{color:'#FFFFFF',maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{size:10}},grid:{color:c.grid}},
-          y:{ticks:{color:'#FFFFFF',font:{size:10},callback:v=>displayPct?`${(Number(v)*100).toFixed(0)}%`:v},grid:{color:c.grid}}
+          x:{
+            ticks:{color:c.text,maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{size:10}},
+            grid:{color:c.grid}
+          },
+          y:{
+            ticks:{
+              color:c.text,
+              font:{size:10},
+              callback:v=>isPercent?`${(Number(v)*100).toFixed(0)}%`:Number(v).toLocaleString()
+            },
+            grid:{color:c.grid}
+          }
         }
       }
     });
     kpiTrendCharts.push(ch);
+  };
+
+  // 1) Planner share of terminal load.
+  const loadShareKpi=kpis.find(isLoadPlannedKpi)||{key:'Load Planned',isPercent:true};
+  const shareVals=keys.map(key=>{
+    const prs=plannerRows.filter(r=>periodKey(r,currentPeriodType)===key);
+    const allPeriodRows=allRows.filter(r=>periodKey(r,currentPeriodType)===key);
+    return loadShareForRows(prs,allPeriodRows);
+  });
+  addTrendCard({
+    title:'Load Planned',
+    note:'Planner share of terminal load',
+    vals:shareVals,
+    kpi:loadShareKpi,
+    isPercent:true
   });
 
-  if(!host.children.length)host.innerHTML='<div class="pp-empty" style="grid-column:1/-1">No trend data available for the selected planner.</div>';
+  // 2) Actual load moves planned by the selected planner.
+  const loadMoveVals=keys.map(key=>{
+    const prs=plannerRows.filter(r=>periodKey(r,currentPeriodType)===key);
+    return loadPlannedSum(prs);
+  });
+  addTrendCard({
+    title:'Load Moves',
+    note:'Actual load moves planned by planner',
+    vals:loadMoveVals,
+    isPercent:false,
+    valueFormatter:v=>Math.round(Number(v)||0).toLocaleString()
+  });
+
+  // 3) Remaining KPIs normally.
+  kpis.filter(k=>!isLoadPlannedKpi(k)).forEach(k=>{
+    const vals=keys.map(key=>{
+      const rs=plannerRows.filter(r=>periodKey(r,currentPeriodType)===key);
+      return getKpiValueForPeriod(k,rs,currentPeriodType,key);
+    });
+    const target=targetFor(k,selectedRows);
+    addTrendCard({
+      title:k.key,
+      note:target!==null?`Target ${fmt(target,k.isPercent,2)}`:'Target –',
+      vals,
+      target,
+      kpi:k,
+      isPercent:!!k.isPercent
+    });
+  });
+
+  if(!host.children.length){
+    host.innerHTML='<div class="pp-empty" style="grid-column:1/-1">No trend data available for the selected planner.</div>';
+  }
 }
 
 function renderRegion(){const host=$('regionTerminalGrid');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const rows=DATA[term]||[],planners=new Set(rows.map(r=>r.Planner)).size;const el=document.createElement('div');el.className='pp-term-card'+(term===currentTerminal?' active':'');el.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}">`:''}<div><div class="code">${term}</div><div class="meta">${rows.length?`${rows.length.toLocaleString()} rows · ${planners} planners`:'No upload yet'}</div></div>`;el.onclick=()=>{currentTerminal=term;currentPeriod='';showView('dashboardView');};host.appendChild(el);});}
@@ -1001,7 +1169,68 @@ window.saveKpiSetting=async i=>{const term=$('settingsKpiTerminal').value,year=$
 function renderPlannerRegistry(){const ids=Object.keys(PLANNER_REGISTRY).sort();$('plannerRegistryBody').innerHTML=ids.length?ids.map(id=>{const p=PLANNER_REGISTRY[id]||{};return `<tr><td>${esc(id)}</td><td><input id="plannerName_${esc(id)}" value="${esc(p.plannerName||'')}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 8px;min-width:240px"></td><td><button class="pp-btn" onclick="savePlannerName('${id.replace(/'/g,"\\'")}')">Save</button></td></tr>`}).join(''):'<tr><td colspan="3" style="color:var(--text-muted)">Planner IDs will appear after the first upload.</td></tr>';}
 
 window.savePlannerName=async id=>{const input=document.getElementById('plannerName_'+id);await db.collection('peoplePlannerRegistry').doc(id).set({plannerId:id,plannerName:input.value.trim(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});PLANNER_REGISTRY[id]={...(PLANNER_REGISTRY[id]||{}),plannerName:input.value.trim()};$('sidebarStatus').textContent='Planner saved';};
-async function renderRoles(){const snap=await db.collection('peopleUsers').get();const rows=[];snap.forEach(d=>rows.push({uid:d.id,...d.data()}));$('rolesBody').innerHTML=rows.length?rows.map(u=>`<tr><td>${esc(u.email||'')}</td><td style="font:10px var(--mono)">${esc(u.uid)}</td><td><select id="role_${u.uid}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px" onchange="saveRole('${u.uid}',this.value)">${['management','supervisor','planner','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></td><td>${u.updatedAt&&u.updatedAt.toDate?u.updatedAt.toDate().toLocaleString():'–'}</td></tr>`).join(''):'<tr><td colspan="4">No users registered.</td></tr>';}
-window.saveRole=async(uid,role)=>{if(CURRENT_ROLE!=='management'){alert('Only management can change roles.');renderRoles();return;}await db.collection('peopleUsers').doc(uid).set({role,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});$('sidebarStatus').textContent='Role updated';};
+async function renderRoles(){
+  if(CURRENT_ROLE!=='management'){
+    $('rolesBody').innerHTML='<tr><td colspan="4">Management access required.</td></tr>';
+    if($('addUserPanel'))$('addUserPanel').style.display='none';
+    return;
+  }
+  if($('addUserPanel'))$('addUserPanel').style.display='';
+  const snap=await db.collection('peopleUsers').get();
+  const rows=[];
+  snap.forEach(d=>rows.push({uid:d.id,...d.data()}));
+  rows.sort((a,b)=>String(a.email||'').localeCompare(String(b.email||'')));
+  $('rolesBody').innerHTML=rows.length?rows.map(u=>`<tr>
+    <td>${esc(u.email||'')}</td>
+    <td style="font:10px var(--mono)">${esc(u.uid)}</td>
+    <td><select id="role_${u.uid}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px" onchange="saveRole('${u.uid}',this.value)">
+      ${['management','supervisor','planner','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
+    </select></td>
+    <td>${u.updatedAt&&u.updatedAt.toDate?u.updatedAt.toDate().toLocaleString():'–'}</td>
+  </tr>`).join(''):'<tr><td colspan="4">No users registered.</td></tr>';
+}
+window.saveRole=async(uid,role)=>{
+  if(CURRENT_ROLE!=='management'){alert('Only management can change roles.');renderRoles();return;}
+  await db.collection('peopleUsers').doc(uid).set({role,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+  $('sidebarStatus').textContent='Role updated';
+};
+
+async function createPlatformUser(){
+  if(CURRENT_ROLE!=='management'){alert('Only management can add users.');return;}
+  const email=$('newUserEmail').value.trim();
+  const password=$('newUserPassword').value;
+  const role=$('newUserRole').value;
+  const status=$('addUserStatus');
+  if(!email){status.textContent='Enter the user email.';status.className='pp-status err';return;}
+  if(!password||password.length<6){status.textContent='Temporary password must be at least 6 characters.';status.className='pp-status err';return;}
+  status.textContent='Creating user…';status.className='pp-status';
+  let secondary=null;
+  try{
+    const secondaryName='peopleUserCreator';
+    try{secondary=firebase.app(secondaryName);}catch(e){secondary=firebase.initializeApp(firebaseConfig,secondaryName);}
+    const cred=await secondary.auth().createUserWithEmailAndPassword(email,password);
+    const uid=cred.user.uid;
+    await db.collection('peopleUsers').doc(uid).set({
+      email,
+      role,
+      createdBy:CURRENT_USER.email||CURRENT_USER.uid,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+    await secondary.auth().signOut();
+    $('newUserEmail').value='';
+    $('newUserPassword').value='';
+    $('newUserRole').value='viewer';
+    status.textContent=`✓ User created and assigned ${role} role.`;
+    status.className='pp-status ok';
+    await renderRoles();
+  }catch(e){
+    console.error(e);
+    status.textContent='User creation failed: '+String(e.message||e).replace('Firebase: ','');
+    status.className='pp-status err';
+    try{if(secondary)await secondary.auth().signOut();}catch(_){}
+  }
+}
+
 </script>
 </body></html>
