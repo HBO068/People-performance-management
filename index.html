@@ -48,6 +48,14 @@ table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:10px;bord
 @media(max-width:1050px){.app{grid-template-columns:220px 1fr}.grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.app{display:block}.sidebar{position:relative;height:auto}.topbar{position:relative}.grid,.two-col,.form-grid{grid-template-columns:1fr}.content{padding:14px}}
 @media print{.sidebar,.top-actions,.filters,.tabs,.btn{display:none!important}.app{display:block}.topbar{position:relative}.content{padding:0}.section,.card,.hero{box-shadow:none;break-inside:avoid}}
+
+/* Reference-platform visual identity */
+:root{--bg:#08161F;--bg2:#08161F;--panel:#0F2531;--panel2:#122B38;--sidebar:#0F2531;--line:#1D3D4C;--text:#E9F2F5;--muted:#7E9AA8;--accent:#3ED17E;--accent2:#3ED17E;--input:#122B38}
+html[data-theme="light"]{--bg:#F3F6F8;--bg2:#F3F6F8;--panel:#FFFFFF;--panel2:#EEF3F6;--sidebar:#FFFFFF;--line:#D7E0E6;--text:#16242E;--muted:#57707D;--accent:#1B9E63;--accent2:#1B9E63;--input:#FFFFFF}
+body{background:radial-gradient(ellipse at top left,rgba(47,217,190,.06),transparent 45%),radial-gradient(ellipse at bottom right,rgba(79,166,232,.06),transparent 45%),var(--bg)!important}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:42px 42px;mask-image:radial-gradient(ellipse at 50% 0%,black 0%,transparent 75%)}
+.app{grid-template-columns:128px 1fr!important;position:relative}.sidebar{padding:16px 10px!important}.brand{flex-direction:column;text-align:center;padding:0 2px 12px!important;gap:7px!important}.brand-mark{width:56px!important;height:56px!important;border-radius:10px!important;background:#0A1D27!important;border:1px solid #173241;color:var(--accent)!important}.brand h1{font-size:12px!important}.brand small{font-size:9px!important}.nav-group{font-size:8.5px!important;margin:9px 5px 3px!important;padding-top:8px;border-top:1px solid #173241}.nav-btn{text-align:center!important;padding:8px 5px!important;border:1px solid transparent!important;border-radius:8px!important;font-size:10.5px!important;color:var(--muted)!important}.nav-btn.active{background:rgba(62,209,126,.14)!important;color:var(--accent)!important;border-color:var(--accent)!important}.topbar{background:transparent!important;border-bottom:0!important}.hero,.card,.section{box-shadow:none!important;border-radius:12px!important}.hero{background:var(--panel)!important}.terminal-pill{border-radius:8px!important;font-family:'IBM Plex Mono',monospace}.terminal-pill.active{background:var(--accent)!important;color:#04211c!important;box-shadow:none!important}
+
 </style>
 </head>
 <body>
@@ -296,26 +304,21 @@ function filteredVessels(){return VESSELS.filter(v=>(selectedTerminal==="ALL"||v
 function renderVessels(){const rows=filteredVessels();$("filteredCount").textContent=rows.length;$("selectedPlannerLabel").textContent=$("fPlanner").value?plannerName($("fPlanner").value):"All";$("vesselBody").innerHTML=rows.slice(0,1000).map(v=>`<tr><td>${esc(v.terminal)}</td><td>${esc(v.vesselVisit)}</td><td>${esc(v.vesselName)}</td><td>${esc(v.plannerId)}</td><td>${esc(plannerName(v.plannerId))}</td><td>${esc(v.etbText||"")}</td><td>${esc(v.year)}</td><td>${esc(v.quarter)}</td><td>${esc(v.month)}</td><td>${esc(v.week)}</td></tr>`).join("")}
 
 $("uploadBtn").onclick=async()=>{
-  const f=$("fileInput").files[0];if(!f)return alert("Choose a file first.");$("uploadStatus").textContent="Reading file...";
-  try{
-    const data=await f.arrayBuffer();const wb=XLSX.read(data,{type:"array",cellDates:true});let all=[];
-    wb.SheetNames.forEach(sn=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:"",raw:true});if(rows.length)all.push(...rows)});
-    const parsed=[];for(const r of all){
-      const terminal=String(pick(r,["Terminal","Terminal Code","POD"])).trim().toUpperCase();
-      const plannerId=String(pick(r,["Planner","Planner ID","PlannerID","Planner Id"])).trim();
-      const etb=parseDate(pick(r,["ETB","E.T.B","E T B","Estimated Time of Berthing"]));
-      const vesselVisit=String(pick(r,["Vessel Visit","Vessel Visit ID","VesselVisit","Visit"])).trim();
-      const vesselName=String(pick(r,["Vessel Name","Vessel","VesselName"])).trim();
-      if(!terminal||!etb) continue;
-      const year=etb.getFullYear(), quarter=`Q${Math.floor(etb.getMonth()/3)+1}`;
-      const rec={terminal,vesselVisit,vesselName,plannerId,etb:firebase.firestore.Timestamp.fromDate(etb),etbText:etb.toISOString(),year,quarter,month:monthLabel(etb),week:isoWeek(etb),day:dayLabel(etb),sourceFile:f.name,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()};
-      rec.recordKey=[terminal,vesselVisit,plannerId,rec.etbText].join("|");parsed.push(rec);
-    }
-    if(!parsed.length)throw new Error("No valid rows found with Terminal and ETB.");
-    let written=0;for(let i=0;i<parsed.length;i+=400){const batch=db.batch();parsed.slice(i,i+400).forEach(r=>{const id=btoa(unescape(encodeURIComponent(r.recordKey))).replace(/[+/=]/g,"").slice(0,120);batch.set(db.collection("vesselRecords").doc(id),r,{merge:true});written++});await batch.commit()}
-    await db.collection("uploads").add({filename:f.name,type:"vessel",rowsRead:all.length,rowsAccepted:parsed.length,uploadedBy:CURRENT_USER.uid,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()});
-    $("uploadStatus").textContent=`Uploaded ${parsed.length} vessel records from ${all.length} rows.`;await loadAll();renderAll();
-  }catch(e){$("uploadStatus").textContent="Upload failed: "+e.message}
+ const f=$("fileInput").files[0];if(!f)return alert("Choose a file first.");$("uploadStatus").textContent="Reading file...";
+ try{
+  const data=await f.arrayBuffer(),wb=XLSX.read(data,{type:"array",cellDates:true,cellFormula:true});
+  const norm=x=>String(x??"").replace(/\s+/g," ").trim().toLowerCase();
+  const findHeader=(ws,groups)=>{const a=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:true});for(let i=0;i<Math.min(a.length,80);i++){const h=a[i].map(norm);if(groups.every(g=>g.some(x=>h.includes(norm(x)))))return i}return -1};
+  const rows=(ws,h)=>h<0?[]:XLSX.utils.sheet_to_json(ws,{defval:"",raw:true,range:h});
+  const visitETB=new Map();
+  for(const sn of wb.SheetNames){const ws=wb.Sheets[sn],h=findHeader(ws,[["Id visit","Vessel Visit","Vessel Visit ID"],["ETB"]]);if(h<0)continue;for(const r of rows(ws,h)){const v=String(pick(r,["Id visit","Vessel Visit","Vessel Visit ID","Visit"])).trim(),d=parseDate(pick(r,["ETB","E.T.B","E T B","Estimated Time of Berthing"]));if(v&&d&&!visitETB.has(v))visitETB.set(v,d)}}
+  let all=[];for(const sn of wb.SheetNames){const ws=wb.Sheets[sn],h=findHeader(ws,[["Terminal","Terminal Code","POD"],["Planner","Planner ID","PlannerID","Planner Id"],["Id visit","Vessel Visit","Vessel Visit ID","Visit"]]);if(h>=0)all.push(...rows(ws,h))}
+  const parsed=[];
+  for(const r of all){const terminal=String(pick(r,["Terminal","Terminal Code","POD"])).trim().toUpperCase(),plannerId=String(pick(r,["Planner","Planner ID","PlannerID","Planner Id"])).trim(),vesselVisit=String(pick(r,["Id visit","Vessel Visit","Vessel Visit ID","VesselVisit","Visit"])).trim(),vesselName=String(pick(r,["Vessel Name","Vessel","VesselName"])).trim();let etb=parseDate(pick(r,["ETB","E.T.B","E T B","Estimated Time of Berthing"]));if(!etb&&vesselVisit)etb=visitETB.get(vesselVisit)||null;if(!terminal||!plannerId||!vesselVisit||!etb)continue;const year=etb.getFullYear(),quarter=`Q${Math.floor(etb.getMonth()/3)+1}`;const rec={terminal,vesselVisit,vesselName,plannerId,etb:firebase.firestore.Timestamp.fromDate(etb),etbText:etb.toISOString(),year,quarter,month:monthLabel(etb),week:isoWeek(etb),day:dayLabel(etb),sourceFile:f.name,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()};rec.uploadedValues={};["Full","Empties","Load Planned 20ft","Load Planned 40ft/45ft","Total Discharge Planned","Load Planned ","Total Moves Planned ","Rehandles","Yard Clashes","RTG Moves Before Gantry","Loading Points","Twins Planning","Alternation","Planner Score"].forEach(k=>{const v=pick(r,[k,k.trim()]);if(v!==""&&v!=null)rec.uploadedValues[k.trim()]=v});rec.recordKey=[terminal,vesselVisit,plannerId,rec.etbText].join("|");parsed.push(rec)}
+  if(!parsed.length)throw new Error("No valid planner rows were found after reading the workbook.");
+  for(let i=0;i<parsed.length;i+=400){const batch=db.batch();parsed.slice(i,i+400).forEach(r=>{const id=btoa(unescape(encodeURIComponent(r.recordKey))).replace(/[+/=]/g,"").slice(0,120);batch.set(db.collection("vesselRecords").doc(id),r,{merge:true})});await batch.commit()}
+  await db.collection("uploads").add({filename:f.name,type:"vessel",rowsRead:all.length,rowsAccepted:parsed.length,uploadedBy:CURRENT_USER.uid,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()});$("uploadStatus").textContent=`Uploaded ${parsed.length} planner rows successfully from ${all.length} workbook rows.`;await loadAll();renderAll();
+ }catch(e){console.error(e);$("uploadStatus").textContent="Upload failed: "+e.message}
 };
 $("exportFiltered").onclick=()=>{const rows=filteredVessels().map(v=>({Terminal:v.terminal,"Vessel Visit":v.vesselVisit,"Vessel Name":v.vesselName,"Planner ID":v.plannerId,"Planner Name":plannerName(v.plannerId),ETB:v.etbText,Year:v.year,Quarter:v.quarter,Month:v.month,Week:v.week,Day:v.day}));const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Planner Performance");XLSX.writeFile(wb,"People_Performance_Filtered.xlsx")};
 </script>
