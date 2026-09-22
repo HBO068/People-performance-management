@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
   :root{
     --bg:#08161F; --bg-grid: rgba(255,255,255,0.025);
@@ -400,10 +401,38 @@
 .pp-flag-pill{display:inline-flex;align-items:center;gap:6px}.pp-flag-pill img{width:25px;height:17px;object-fit:cover;border-radius:2px;border:1px solid var(--border)}
 .pp-login{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.pp-login-card{width:min(420px,100%);background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:26px;box-shadow:0 18px 50px rgba(0,0,0,.28)}.pp-login-card .logo{width:64px;height:64px;margin:0 auto 14px;background:#0A1D27;border:1px solid var(--border-soft);border-radius:11px;display:flex;align-items:center;justify-content:center}.pp-login-card .logo img{width:100%;height:100%;object-fit:contain;padding:7px}.pp-login-card h1{font:700 20px var(--display);text-align:center;margin:0}.pp-login-card .sub{text-align:center;color:var(--text-muted);font-size:11px;margin:5px 0 18px}.pp-login-card label{font:700 9px var(--display);letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted)}.pp-login-card input{width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 11px;margin:5px 0 12px;font:12px var(--mono)}.pp-login-error{color:var(--coral);font-size:11px;margin-top:10px;min-height:16px}
 .pp-gauge-grid{display:grid;grid-template-columns:300px 1fr;gap:12px;margin-bottom:16px}.pp-gauge{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px;min-height:235px}.pp-gauge .label,.pp-trend .label{font:700 10px var(--display);letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted)}.pp-gauge canvas{max-height:180px}.pp-trend{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px;min-height:235px}.pp-trend canvas{max-height:190px}
+.pp-kpi-trend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}.pp-kpi-trend-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px;min-height:245px}.pp-kpi-trend-card .head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px}.pp-kpi-trend-card .label{font:700 10px var(--display);letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted)}.pp-kpi-trend-card .target-note{font:10px var(--mono);color:var(--text-faint)}.pp-kpi-trend-card canvas{max-height:190px}@media(max-width:900px){.pp-kpi-trend-grid{grid-template-columns:1fr}}
 @media(max-width:1050px){.pp-summary-grid{grid-template-columns:repeat(3,1fr)}.pp-volume-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.pp-summary-grid,.pp-volume-grid{grid-template-columns:1fr}.pp-gauge-grid{grid-template-columns:1fr}.pp-toolbar{align-items:stretch}.pp-field select,.pp-field input{width:100%}}
 @media print{.pp-no-print,.pp-filter-card,.pp-settings-tabs{display:none!important}.pp-view{display:none!important}.pp-view.active{display:block!important}.pp-summary-grid{grid-template-columns:repeat(3,1fr)!important}}
 </style>
+
+<style>
+body.pp-exporting .pp-no-print,
+body.pp-exporting .sidebar,
+body.pp-exporting #printMenu,
+body.pp-exporting .pp-settings-tabs,
+body.pp-exporting .pp-filter-card{display:none!important}
+body.pp-exporting .app-shell,
+body.pp-exporting .main-area,
+body.pp-exporting #mainApp,
+body.pp-exporting #printArea{
+  width:100%!important;max-width:none!important;margin:0!important;
+  padding-left:0!important;overflow:visible!important
+}
+body.pp-exporting .pp-view{display:none!important}
+body.pp-exporting .pp-view.active{display:block!important}
+body.pp-exporting .chart-card,
+body.pp-exporting .table-card,
+body.pp-exporting .score-card,
+body.pp-exporting .gauge-card,
+body.pp-exporting .trend-card,
+body.pp-exporting .term-card,
+body.pp-exporting .vcard,
+body.pp-exporting .ncard{break-inside:avoid;box-shadow:none!important}
+body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+</style>
+
 </head>
 <body>
 <div class="bg-grid"></div>
@@ -493,10 +522,10 @@
 
       <section id="settingsView" class="pp-view">
         <div class="topbar" style="margin-top:2px"><div class="brand-text"><div class="t1">Settings</div><div class="t2">People Performance Management configuration</div></div></div>
-        <div class="pp-settings-tabs pp-no-print" id="settingsTabs"><button class="active" data-pane="regionsPane">Regions &amp; Terminals</button><button data-pane="kpiPane">KPI Catalog</button><button data-pane="plannerPane">Planner Registry</button><button data-pane="rolesPane">Users &amp; Roles</button></div>
+        <div class="pp-settings-tabs pp-no-print" id="settingsTabs"><button class="active" data-pane="regionsPane">Regions &amp; Terminals</button><button data-pane="kpiPane">KPI Targets &amp; Aggregation</button><button data-pane="plannerPane">Planner Registry</button><button data-pane="rolesPane">Users &amp; Roles</button></div>
         <div id="regionsPane" class="pp-settings-pane active"><div class="pp-settings-box"><h3>Tangier</h3><p>Only Tangier is configured in this platform. The existing terminal flags from the reference platform are retained.</p><div class="pp-terminal-grid" id="settingsTerminalGrid"></div></div></div>
-        <div id="kpiPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>KPI Catalog &amp; Aggregation</h3><p>The aggregation shown here is read from each uploaded workbook's period formulas. Weighted contribution columns are SUM; final repeated period results are MAX, preventing double counting.</p><div class="pp-field" style="max-width:220px;margin-bottom:10px"><label>Terminal</label><select id="settingsKpiTerminal"></select></div><div class="pp-table-card"><table><thead><tr><th>KPI</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Yearly</th><th>Target Column</th><th>Weight Column</th></tr></thead><tbody id="kpiSettingsBody"></tbody></table></div></div></div>
-        <div id="plannerPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>Planner Registry</h3><p>Planner IDs are discovered from uploaded terminal workbooks. Add a display name without changing the source Planner ID.</p><div class="pp-table-card"><table><thead><tr><th>Planner ID</th><th>Planner Name</th><th>Terminals Seen</th><th></th></tr></thead><tbody id="plannerRegistryBody"></tbody></table></div></div></div>
+        <div id="kpiPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>KPI Targets &amp; Aggregation</h3><p>Keep the KPI logic from the uploaded terminal workbook: SUM stays SUM and MAX stays MAX. Targets and weights can be reviewed or overridden by terminal and year without changing planner records.</p><div class="pp-toolbar" style="margin-bottom:12px"><div class="pp-field"><label>Terminal</label><select id="settingsKpiTerminal"></select></div><div class="pp-field"><label>Year</label><select id="settingsKpiYear"></select></div></div><div class="pp-table-card"><table><thead><tr><th>KPI</th><th>Daily</th><th>Weekly</th><th>Monthly</th><th>Quarterly</th><th>Yearly</th><th>Target</th><th>Weight</th><th></th></tr></thead><tbody id="kpiSettingsBody"></tbody></table></div></div></div>
+        <div id="plannerPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>Planner Registry</h3><p>Planner IDs are global. A planner can work on multiple terminals; the registry does not assign or restrict a planner to any terminal.</p><div class="pp-table-card"><table><thead><tr><th>Planner ID</th><th>Planner Name</th><th></th></tr></thead><tbody id="plannerRegistryBody"></tbody></table></div></div></div>
         <div id="rolesPane" class="pp-settings-pane"><div class="pp-settings-box"><h3>Users &amp; Roles</h3><p>Roles are stored in the new People Performance Firebase project. Firestore security can be tightened to these roles after setup.</p><div class="pp-table-card"><table><thead><tr><th>Email</th><th>UID</th><th>Role</th><th>Updated</th></tr></thead><tbody id="rolesBody"></tbody></table></div></div></div>
       </section>
     </div>
@@ -516,9 +545,9 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(), db=firebase.firestore(), ASSETS=window.__ASSETS__;
 const TANGIER_TERMINALS=["BHBAH", "DKAAR", "EGPSD", "HRRJK", "ITVAD", "JOAQJ", "LRMLW", "MAMED", "MAPTM", "NGAPP", "NGONN", "OMSLL", "SEGOT"];
-let CURRENT_USER=null, CURRENT_ROLE='viewer', DATA={}, CATALOG={}, PLANNER_REGISTRY={}, UPLOAD_HISTORY=[];
+let CURRENT_USER=null, CURRENT_ROLE='viewer', DATA={}, CATALOG={}, PLANNER_REGISTRY={}, UPLOAD_HISTORY=[], KPI_SETTINGS={};
 let currentTerminal='MAPTM', currentPlanner='ALL', currentPeriodType='weekly', currentPeriod='';
-let gaugeChart=null, trendChart=null;
+let gaugeChart=null, trendChart=null, kpiTrendCharts=[];
 const PERIODS=['daily','weekly','monthly','quarterly','yearly'];
 const PERIOD_LABEL={daily:'Daily',weekly:'Weekly',monthly:'Monthly',quarterly:'Quarterly',yearly:'Yearly'};
 const $=id=>document.getElementById(id);
@@ -537,8 +566,65 @@ $('settingsTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{document.
 
 $('printBtn').onclick=e=>{e.stopPropagation();$('printMenu').style.display=$('printMenu').style.display==='none'?'block':'none';};
 document.addEventListener('click',()=>{$('printMenu').style.display='none'});
-$('printPdfBtn').onclick=()=>window.print();
-$('printImageBtn').onclick=async()=>{const c=await html2canvas($('printArea'),{backgroundColor:getComputedStyle(document.body).backgroundColor,scale:1.5});const a=document.createElement('a');a.download=`People_Performance_${currentTerminal}_${currentPlanner}_${currentPeriodType}.png`;a.href=c.toDataURL('image/png');a.click();};
+function ppExportBaseName(){
+  const safe=v=>String(v||'All').replace(/[\\/:*?"<>|]/g,'-');
+  return `People_Performance_${safe(currentTerminal)}_${safe(currentPlanner)}_${safe(currentPeriodType)}`;
+}
+async function ppCaptureCurrentReport(){
+  if(!window.html2canvas) throw new Error('Image export library did not load.');
+  const el=$('printArea');
+  const menu=$('printMenu');
+  const oldDisplay=menu.style.display;
+  menu.style.display='none';
+  document.body.classList.add('pp-exporting');
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  try{
+    return await html2canvas(el,{
+      backgroundColor:getComputedStyle(document.body).backgroundColor,
+      scale:2,useCORS:true,logging:false,
+      scrollX:0,scrollY:-window.scrollY,
+      windowWidth:Math.max(document.documentElement.clientWidth,el.scrollWidth),
+      windowHeight:Math.max(document.documentElement.clientHeight,el.scrollHeight)
+    });
+  }finally{
+    document.body.classList.remove('pp-exporting');
+    menu.style.display=oldDisplay;
+  }
+}
+$('printPdfBtn').onclick=async()=>{
+  try{
+    $('printMenu').style.display='none';
+    const canvas=await ppCaptureCurrentReport();
+    if(!window.jspdf||!window.jspdf.jsPDF) throw new Error('PDF export library did not load.');
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
+    const pageW=pdf.internal.pageSize.getWidth(), pageH=pdf.internal.pageSize.getHeight();
+    const margin=6, imgW=pageW-margin*2, usableH=pageH-margin*2;
+    const pxPerMm=canvas.width/imgW;
+    const slicePx=Math.floor(usableH*pxPerMm);
+    let y=0, page=0;
+    while(y<canvas.height){
+      const h=Math.min(slicePx,canvas.height-y);
+      const slice=document.createElement('canvas');
+      slice.width=canvas.width; slice.height=h;
+      slice.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+      if(page>0) pdf.addPage('a4','landscape');
+      pdf.addImage(slice.toDataURL('image/jpeg',0.96),'JPEG',margin,margin,imgW,h/pxPerMm,undefined,'FAST');
+      y+=h; page++;
+    }
+    pdf.save(ppExportBaseName()+'.pdf');
+  }catch(e){console.error(e);alert('PDF export failed: '+e.message);}
+};
+$('printImageBtn').onclick=async()=>{
+  try{
+    $('printMenu').style.display='none';
+    const c=await ppCaptureCurrentReport();
+    const a=document.createElement('a');
+    a.download=ppExportBaseName()+'.png';
+    a.href=c.toDataURL('image/png');
+    a.click();
+  }catch(e){console.error(e);alert('Image export failed: '+e.message);}
+};
 
 $('loginBtn').onclick=async()=>{try{$('loginError').textContent='';await auth.signInWithEmailAndPassword($('loginEmail').value.trim(),$('loginPassword').value);}catch(e){$('loginError').textContent=e.message;}};
 $('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click();});
@@ -548,11 +634,11 @@ auth.onAuthStateChanged(async user=>{CURRENT_USER=user;if(!user){$('loginView').
 
 async function ensureUserProfile(){const ref=db.collection('peopleUsers').doc(CURRENT_USER.uid);const snap=await ref.get();if(snap.exists){CURRENT_ROLE=snap.data().role||'viewer';return;}const users=await db.collection('peopleUsers').limit(1).get();CURRENT_ROLE=users.empty?'management':'viewer';await ref.set({email:CURRENT_USER.email||'',role:CURRENT_ROLE,createdAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}
 
-async function loadEverything(){DATA={};CATALOG={};PLANNER_REGISTRY={};UPLOAD_HISTORY=[];$('sidebarStatus').textContent='Loading…';try{const knownSnap=await db.collection('peopleMeta').doc('knownTerminals').get();const loaded=(knownSnap.exists&&Array.isArray(knownSnap.data().terminals))?knownSnap.data().terminals:[];for(const term of loaded){await loadTerminal(term);}const reg=await db.collection('peoplePlannerRegistry').get();reg.forEach(d=>PLANNER_REGISTRY[d.id]=d.data());const hist=await db.collection('peopleUploads').orderBy('uploadedAt','desc').limit(100).get();hist.forEach(d=>UPLOAD_HISTORY.push({id:d.id,...d.data()}));$('sidebarStatus').textContent=`${loaded.length} terminal${loaded.length===1?'':'s'} loaded`;const first=loaded.includes(currentTerminal)?currentTerminal:(loaded[0]||currentTerminal);currentTerminal=first;}catch(e){console.error(e);$('sidebarStatus').textContent='Data load issue';}}
+async function loadEverything(){DATA={};CATALOG={};PLANNER_REGISTRY={};UPLOAD_HISTORY=[];KPI_SETTINGS={};$('sidebarStatus').textContent='Loading…';try{const knownSnap=await db.collection('peopleMeta').doc('knownTerminals').get();const loaded=(knownSnap.exists&&Array.isArray(knownSnap.data().terminals))?knownSnap.data().terminals:[];for(const term of loaded){await loadTerminal(term);}const reg=await db.collection('peoplePlannerRegistry').get();reg.forEach(d=>PLANNER_REGISTRY[d.id]=d.data());const ks=await db.collection('peopleKpiSettings').get();ks.forEach(d=>{const x=d.data()||{};if(x.terminal&&x.year){KPI_SETTINGS[x.terminal]=KPI_SETTINGS[x.terminal]||{};KPI_SETTINGS[x.terminal][String(x.year)]=x.settings||{};}});const hist=await db.collection('peopleUploads').orderBy('uploadedAt','desc').limit(100).get();hist.forEach(d=>UPLOAD_HISTORY.push({id:d.id,...d.data()}));$('sidebarStatus').textContent=`${loaded.length} terminal${loaded.length===1?'':'s'} loaded`;const first=loaded.includes(currentTerminal)?currentTerminal:(loaded[0]||currentTerminal);currentTerminal=first;}catch(e){console.error(e);$('sidebarStatus').textContent='Data load issue';}}
 
 async function loadTerminal(term){DATA[term]=[];const months=await db.collection('peopleTerminalData').doc(term).collection('months').get();months.forEach(d=>DATA[term].push(...(d.data().rows||[])));const c=await db.collection('peopleCatalog').doc(term).get();if(c.exists)CATALOG[term]=c.data().catalog||[];}
 
-function buildTerminalPills(){const host=$('terminalPills');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const b=document.createElement('button');b.className='term-pill'+(term===currentTerminal?' active':'');b.dataset.term=term;b.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}" style="width:23px;height:15px;object-fit:cover;border-radius:2px;vertical-align:middle;margin-right:6px">`:''}${term}`;b.onclick=()=>{currentTerminal=term;currentPlanner='ALL';currentPeriod='';buildTerminalPills();renderDashboard();};host.appendChild(b);});}
+function buildTerminalPills(){const host=$('terminalPills');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const b=document.createElement('button');b.className='term-pill'+(term===currentTerminal?' active':'');b.dataset.term=term;b.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}" style="width:23px;height:15px;object-fit:cover;border-radius:2px;vertical-align:middle;margin-right:6px">`:''}${term}`;b.onclick=()=>{currentTerminal=term;currentPeriod='';buildTerminalPills();renderDashboard();};host.appendChild(b);});}
 function buildPeriodTabs(){const host=$('periodTypeTabs');host.innerHTML='';PERIODS.forEach(p=>{const b=document.createElement('button');b.className='pp-period-btn'+(p===currentPeriodType?' active':'');b.textContent=PERIOD_LABEL[p];b.onclick=()=>{currentPeriodType=p;currentPeriod='';buildPeriodTabs();renderDashboard();};host.appendChild(b);});}
 
 function parseExcelDate(v){if(v instanceof Date&&!isNaN(v))return v;if(typeof v==='number'&&isFinite(v)){const o=XLSX.SSF.parse_date_code(v);if(o)return new Date(Date.UTC(o.y,o.m-1,o.d,o.H||0,o.M||0,Math.floor(o.S||0)));}if(typeof v==='string'&&v.trim()){const d=new Date(v);if(!isNaN(d))return d;}return null;}
@@ -576,7 +662,7 @@ function parseWorkbook(buffer){const wb=XLSX.read(buffer,{type:'array',cellDates
 $('uploadDataBtn').onclick=async()=>{const f=$('uploadFile').files[0];if(!f)return setUploadStatus('Choose an XLSM/XLSX file first.','err');try{setUploadStatus('Reading workbook…','');const parsed=parseWorkbook(await f.arrayBuffer());renderUploadPreview(parsed,f.name);setUploadStatus(`Uploading ${parsed.rows.length.toLocaleString()} planner rows for ${parsed.term}…`,'');await persistUpload(parsed,f.name);setUploadStatus(`✓ ${parsed.term}: ${parsed.rows.length.toLocaleString()} rows uploaded successfully.`,'ok');await loadEverything();currentTerminal=parsed.term;currentPlanner='ALL';currentPeriod='';buildTerminalPills();showView('dashboardView');}catch(e){console.error(e);setUploadStatus('Upload failed: '+e.message,'err');}};
 function setUploadStatus(t,c){$('uploadStatus').textContent=t;$('uploadStatus').className='pp-status '+(c||'');}
 function renderUploadPreview(p,file){const planners=new Set(p.rows.map(r=>r.Planner));$('uploadPreview').innerHTML=`<div class="pp-section-label">Detected Workbook</div><div class="pp-summary-grid"><div class="pp-kpi-card"><div class="label">Terminal</div><div class="value">${esc(p.term)}</div></div><div class="pp-kpi-card"><div class="label">Planner Rows</div><div class="value">${p.rows.length.toLocaleString()}</div></div><div class="pp-kpi-card"><div class="label">Planners</div><div class="value">${planners.size}</div></div><div class="pp-kpi-card"><div class="label">KPIs Detected</div><div class="value">${p.catalog.length}</div></div><div class="pp-kpi-card"><div class="label">Source</div><div style="margin-top:12px;font:11px var(--mono);word-break:break-word">${esc(file)}</div></div></div>`;}
-async function persistUpload(parsed,filename){const byMonth={};for(const r of parsed.rows){const d=parseExcelDate(r.ETB);const key=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;(byMonth[key]||(byMonth[key]=[])).push(r);}for(const [month,rows] of Object.entries(byMonth)){await db.collection('peopleTerminalData').doc(parsed.term).collection('months').doc(month).set({terminal:parsed.term,month,rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}await db.collection('peopleCatalog').doc(parsed.term).set({terminal:parsed.term,catalog:parsed.catalog,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});const meta=db.collection('peopleMeta').doc('knownTerminals');await db.runTransaction(async tx=>{const s=await tx.get(meta);const list=s.exists&&Array.isArray(s.data().terminals)?s.data().terminals:[];if(!list.includes(parsed.term))list.push(parsed.term);tx.set(meta,{terminals:list.sort(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});});const planners=[...new Set(parsed.rows.map(r=>norm(r.Planner)).filter(Boolean))];for(const pid of planners){const ref=db.collection('peoplePlannerRegistry').doc(pid);const s=await ref.get();const old=s.exists?s.data():{};const terms=[...new Set([...(old.terminals||[]),parsed.term])];await ref.set({plannerId:pid,plannerName:old.plannerName||'',terminals:terms,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}await db.collection('peopleUploads').add({terminal:parsed.term,filename,rows:parsed.rows.length,planners:planners.length,uploadedBy:CURRENT_USER.email||CURRENT_USER.uid,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()});}
+async function persistUpload(parsed,filename){const byMonth={};for(const r of parsed.rows){const d=parseExcelDate(r.ETB);const key=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;(byMonth[key]||(byMonth[key]=[])).push(r);}for(const [month,rows] of Object.entries(byMonth)){await db.collection('peopleTerminalData').doc(parsed.term).collection('months').doc(month).set({terminal:parsed.term,month,rows,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}await db.collection('peopleCatalog').doc(parsed.term).set({terminal:parsed.term,catalog:parsed.catalog,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});const meta=db.collection('peopleMeta').doc('knownTerminals');await db.runTransaction(async tx=>{const s=await tx.get(meta);const list=s.exists&&Array.isArray(s.data().terminals)?s.data().terminals:[];if(!list.includes(parsed.term))list.push(parsed.term);tx.set(meta,{terminals:list.sort(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});});const planners=[...new Set(parsed.rows.map(r=>norm(r.Planner)).filter(Boolean))];for(const pid of planners){const ref=db.collection('peoplePlannerRegistry').doc(pid);const s=await ref.get();const old=s.exists?s.data():{};await ref.set({plannerId:pid,plannerName:old.plannerName||'',updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}await db.collection('peopleUploads').add({terminal:parsed.term,filename,rows:parsed.rows.length,planners:planners.length,uploadedBy:CURRENT_USER.email||CURRENT_USER.uid,uploadedAt:firebase.firestore.FieldValue.serverTimestamp()});}
 
 function getRowsForTerminal(){return DATA[currentTerminal]||[];}
 function plannerName(pid){const n=PLANNER_REGISTRY[pid]&&PLANNER_REGISTRY[pid].plannerName;return n?`${n} (${pid})`:pid;}
@@ -584,8 +670,10 @@ function rebuildPlannerFilter(rows){const sel=$('plannerFilter');const ids=[...n
 function rebuildPeriodFilter(rows){const filtered=currentPlanner==='ALL'?rows:rows.filter(r=>norm(r.Planner)===currentPlanner);const keys=[...new Set(filtered.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort();const sel=$('periodFilter');if(!currentPeriod||!keys.includes(currentPeriod))currentPeriod=keys[keys.length-1]||'';sel.innerHTML=keys.slice().reverse().map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('');sel.value=currentPeriod;sel.onchange=()=>{currentPeriod=sel.value;renderDashboardBody();};}
 
 function getKpiValue(kpi,rows){const col=kpi.period_cols&&kpi.period_cols[currentPeriodType];if(!col)return null;const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);if(!vals.length)return null;const method=(kpi.period_agg&&kpi.period_agg[currentPeriodType])||'MAX';return method==='SUM'?vals.reduce((a,b)=>a+b,0):Math.max(...vals);}
-function targetFor(kpi,rows){if(!kpi.target_col)return null;const vals=rows.map(r=>num(r[kpi.target_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
-function weightFor(kpi,rows){if(!kpi.weight_col)return null;const vals=rows.map(r=>num(r[kpi.weight_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
+function rowYear(r){const d=parseExcelDate(r&&r.ETB);return String(norm(r&&r.Year)||(d?d.getUTCFullYear():''));}
+function kpiOverride(kpi,rows,field){if(!rows||!rows.length)return null;const years=[...new Set(rows.map(rowYear).filter(Boolean))];if(years.length!==1)return null;const term=norm(rows[0].Terminal)||currentTerminal;const item=KPI_SETTINGS[term]&&KPI_SETTINGS[term][years[0]]&&KPI_SETTINGS[term][years[0]][kpi.key];const v=item?num(item[field]):null;return v;}
+function targetFor(kpi,rows){const ov=kpiOverride(kpi,rows,'target');if(ov!==null)return ov;if(!kpi.target_col)return null;const vals=rows.map(r=>num(r[kpi.target_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
+function weightFor(kpi,rows){const ov=kpiOverride(kpi,rows,'weight');if(ov!==null)return ov;if(!kpi.weight_col)return null;const vals=rows.map(r=>num(r[kpi.weight_col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
 
 function renderDashboard(){buildTerminalPills();buildPeriodTabs();const rows=getRowsForTerminal();const flag=$('brandFlag');if(ASSETS.flags[currentTerminal]){flag.src=ASSETS.flags[currentTerminal];flag.style.display='inline-block'}else flag.style.display='none';$('brandTitle').textContent=`${currentTerminal} Planner Performance`;$('brandSubtitle').textContent=`People Performance Management — Tangier · ${PERIOD_LABEL[currentPeriodType]} View`;rebuildPlannerFilter(rows);rebuildPeriodFilter(rows);renderDashboardBody();}
 function renderDashboardBody(){
@@ -628,23 +716,58 @@ function renderDashboardBody(){
   const moves=sum(filtered,'Total Moves Planned ')+sum(filtered,'Total Moves Planned');
   const load=sum(filtered,'Load Planned ')+sum(filtered,'Load Planned');
   const dis=sum(filtered,'Total Discharge Planned');
-  host.innerHTML=`<div class="pp-gauge-grid"><div class="pp-gauge"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score</div><canvas id="plannerGauge"></canvas></div><div class="pp-trend"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score Trend</div><canvas id="plannerTrend"></canvas></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} Volume</div><div class="pp-volume-grid"><div class="pp-volume"><div class="label">Total Moves Planned</div><div class="value">${fmt(moves,false,0)}</div></div><div class="pp-volume"><div class="label">Load Planned</div><div class="value">${fmt(load,false,0)}</div></div><div class="pp-volume"><div class="label">Discharge Planned</div><div class="value">${fmt(dis,false,0)}</div></div><div class="pp-volume"><div class="label">Vessel Calls</div><div class="value">${calls}</div></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} KPI Scorecard</div><div class="pp-summary-grid" id="kpiCards"></div><div class="pp-section-label">Planner Vessel Detail</div><div class="pp-table-card"><table><thead><tr><th>Planner</th><th>Vessel Visit</th><th>Vessel Name</th><th>ETB</th><th>Total Moves</th><th>Planner Score</th></tr></thead><tbody>${filtered.slice().sort((a,b)=>String(a.ETB).localeCompare(String(b.ETB))).map(r=>`<tr><td>${esc(plannerName(norm(r.Planner)))}</td><td>${esc(r['Id visit'])}</td><td>${esc(r['Vessel Name'])}</td><td>${esc(shortDate(r.ETB))}</td><td>${fmt(num(r['Total Moves Planned '])??num(r['Total Moves Planned']),false,0)}</td><td>${fmt(r['Planner Score'],false,2)}</td></tr>`).join('')}</tbody></table></div>`;
+  host.innerHTML=`<div class="pp-gauge-grid"><div class="pp-gauge"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score</div><canvas id="plannerGauge"></canvas></div><div class="pp-trend"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score Trend</div><canvas id="plannerTrend"></canvas></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} Volume</div><div class="pp-volume-grid"><div class="pp-volume"><div class="label">Total Moves Planned</div><div class="value">${fmt(moves,false,0)}</div></div><div class="pp-volume"><div class="label">Load Planned</div><div class="value">${fmt(load,false,0)}</div></div><div class="pp-volume"><div class="label">Discharge Planned</div><div class="value">${fmt(dis,false,0)}</div></div><div class="pp-volume"><div class="label">Vessel Calls</div><div class="value">${calls}</div></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} KPI Scorecard</div><div class="pp-summary-grid" id="kpiCards"></div><div class="pp-section-label">KPI Trends</div><div class="pp-kpi-trend-grid" id="kpiTrendGrid"></div><div class="pp-section-label">Planner Vessel Detail</div><div class="pp-table-card"><table><thead><tr><th>Planner</th><th>Vessel Visit</th><th>Vessel Name</th><th>ETB</th><th>Total Moves</th><th>Planner Score</th></tr></thead><tbody>${filtered.slice().sort((a,b)=>String(a.ETB).localeCompare(String(b.ETB))).map(r=>`<tr><td>${esc(plannerName(norm(r.Planner)))}</td><td>${esc(r['Id visit'])}</td><td>${esc(r['Vessel Name'])}</td><td>${esc(shortDate(r.ETB))}</td><td>${fmt(num(r['Total Moves Planned '])??num(r['Total Moves Planned']),false,0)}</td><td>${fmt(r['Planner Score'],false,2)}</td></tr>`).join('')}</tbody></table></div>`;
   const cards=$('kpiCards');
   catalog.filter(k=>normLow(k.key)!=='planner score').forEach(k=>{const value=getKpiValue(k,filtered),target=targetFor(k,filtered),weight=weightFor(k,filtered),agg=(k.period_agg&&k.period_agg[currentPeriodType])||'MAX';const el=document.createElement('div');el.className='pp-kpi-card';el.innerHTML=`<div class="label">${esc(k.key)}</div><div class="value">${fmt(value,k.isPercent,2)}</div><div class="target">Target ${fmt(target,k.isPercent,2)}${weight!==null?` · Weight ${fmt(weight,true,1)}`:''}</div><div class="agg">${esc(agg)}</div>`;cards.appendChild(el);});
   renderCharts(scoreKpi,filtered,score,scoreTarget);
+  renderKpiTrends(catalog.filter(k=>normLow(k.key)!=='planner score'),filtered);
   $('lastUpdated').textContent=`${filtered.length.toLocaleString()} rows · ${esc(plannerName(currentPlanner))}`;
 }
 function chartColors(){const cs=getComputedStyle(document.documentElement);return {text:cs.getPropertyValue('--text-muted').trim()||'#7E9AA8',grid:cs.getPropertyValue('--border-soft').trim()||'#173241',teal:cs.getPropertyValue('--teal').trim()||'#3ED17E',panel:cs.getPropertyValue('--panel-2').trim()||'#122B38'};}
 function renderCharts(scoreKpi,curRows,score,scoreTarget){if(!document.getElementById('plannerGauge'))return;const c=chartColors();if(gaugeChart)gaugeChart.destroy();const max=scoreTarget&&scoreTarget>0?Math.max(scoreTarget*1.25,5):5;const sv=Math.max(0,Math.min(max,num(score)||0));gaugeChart=new Chart($('plannerGauge'),{type:'doughnut',data:{datasets:[{data:[sv,Math.max(0,max-sv)],backgroundColor:[c.teal,c.panel],borderWidth:0,circumference:180,rotation:270}]},options:{responsive:true,maintainAspectRatio:false,cutout:'76%',plugins:{legend:{display:false},tooltip:{enabled:false}}},plugins:[{id:'centerText',afterDraw(ch){const {ctx,chartArea:{left,right,bottom}}=ch;ctx.save();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text').trim();ctx.font='700 25px Space Grotesk';ctx.textAlign='center';ctx.fillText(fmt(score,false,2),(left+right)/2,bottom-28);ctx.fillStyle=c.text;ctx.font='10px IBM Plex Mono';ctx.fillText(`target ${fmt(scoreTarget,false,2)}`,(left+right)/2,bottom-8);ctx.restore();}}]});if(trendChart)trendChart.destroy();const baseRows=getRowsForTerminal().filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);const keys=[...new Set(baseRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);const vals=keys.map(k=>{const rs=baseRows.filter(r=>periodKey(r,currentPeriodType)===k);return scoreKpi?getKpiValueForPeriod(scoreKpi,rs,currentPeriodType):null;});trendChart=new Chart($('plannerTrend'),{type:'line',data:{labels:keys,datasets:[{data:vals,borderColor:c.teal,backgroundColor:c.teal+'20',fill:true,tension:.3,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:c.text,maxTicksLimit:8},grid:{color:c.grid}},y:{ticks:{color:c.text},grid:{color:c.grid}}}}});}
 function getKpiValueForPeriod(kpi,rows,type){const col=kpi.period_cols&&kpi.period_cols[type];if(!col)return null;const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);if(!vals.length)return null;return ((kpi.period_agg&&kpi.period_agg[type])==='SUM')?vals.reduce((a,b)=>a+b,0):Math.max(...vals);}
+function renderKpiTrends(kpis,selectedRows){
+  kpiTrendCharts.forEach(ch=>{try{ch.destroy()}catch(e){}});kpiTrendCharts=[];
+  const host=$('kpiTrendGrid');if(!host)return;host.innerHTML='';
+  const baseRows=getRowsForTerminal().filter(r=>currentPlanner==='ALL'||norm(r.Planner)===currentPlanner);
+  const keys=[...new Set(baseRows.map(r=>periodKey(r,currentPeriodType)).filter(Boolean))].sort().slice(-12);
+  const c=chartColors();
+  kpis.forEach((k,idx)=>{
+    const vals=keys.map(key=>getKpiValueForPeriod(k,baseRows.filter(r=>periodKey(r,currentPeriodType)===key),currentPeriodType));
+    if(!vals.some(v=>v!==null))return;
+    const target=targetFor(k,selectedRows);
+    const card=document.createElement('div');card.className='pp-kpi-trend-card';
+    card.innerHTML=`<div class="head"><div class="label">${esc(k.key)}</div><div class="target-note">Target ${fmt(target,k.isPercent,2)}</div></div><canvas id="kpiTrend_${idx}"></canvas>`;
+    host.appendChild(card);
+    const datasets=[{label:k.key,data:vals,borderColor:c.teal,backgroundColor:c.teal+'18',fill:true,tension:.28,pointRadius:2}];
+    if(target!==null)datasets.push({label:'Target',data:keys.map(()=>target),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0});
+    const ch=new Chart(document.getElementById(`kpiTrend_${idx}`),{type:'line',data:{labels:keys,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:target!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},scales:{x:{ticks:{color:c.text,maxTicksLimit:7},grid:{color:c.grid}},y:{ticks:{color:c.text,callback:v=>k.isPercent?`${(Number(v)*100).toFixed(0)}%`:v},grid:{color:c.grid}}}}});
+    kpiTrendCharts.push(ch);
+  });
+  if(!host.children.length)host.innerHTML='<div class="pp-empty" style="grid-column:1/-1">No trend data available for the selected planner.</div>';
+}
 
-function renderRegion(){const host=$('regionTerminalGrid');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const rows=DATA[term]||[],planners=new Set(rows.map(r=>r.Planner)).size;const el=document.createElement('div');el.className='pp-term-card'+(term===currentTerminal?' active':'');el.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}">`:''}<div><div class="code">${term}</div><div class="meta">${rows.length?`${rows.length.toLocaleString()} rows · ${planners} planners`:'No upload yet'}</div></div>`;el.onclick=()=>{currentTerminal=term;currentPlanner='ALL';currentPeriod='';showView('dashboardView');};host.appendChild(el);});}
+
+function renderRegion(){const host=$('regionTerminalGrid');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const rows=DATA[term]||[],planners=new Set(rows.map(r=>r.Planner)).size;const el=document.createElement('div');el.className='pp-term-card'+(term===currentTerminal?' active':'');el.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}">`:''}<div><div class="code">${term}</div><div class="meta">${rows.length?`${rows.length.toLocaleString()} rows · ${planners} planners`:'No upload yet'}</div></div>`;el.onclick=()=>{currentTerminal=term;currentPeriod='';showView('dashboardView');};host.appendChild(el);});}
 
 function renderHistory(){const b=$('historyBody');b.innerHTML=UPLOAD_HISTORY.length?UPLOAD_HISTORY.map(h=>`<tr><td>${h.uploadedAt&&h.uploadedAt.toDate?h.uploadedAt.toDate().toLocaleString():'–'}</td><td>${esc(h.terminal)}</td><td>${esc(h.filename)}</td><td>${Number(h.rows||0).toLocaleString()}</td><td>${Number(h.planners||0)}</td><td>${esc(h.uploadedBy)}</td></tr>`).join(''):'<tr><td colspan="6" style="color:var(--text-muted)">No uploads yet.</td></tr>';}
 function renderSettings(){renderRegionSettings();renderKpiSettings();renderPlannerRegistry();renderRoles();}
 function renderRegionSettings(){const host=$('settingsTerminalGrid');host.innerHTML='';TANGIER_TERMINALS.forEach(term=>{const rows=DATA[term]||[];const el=document.createElement('div');el.className='pp-term-card';el.innerHTML=`${ASSETS.flags[term]?`<img src="${ASSETS.flags[term]}">`:''}<div><div class="code">${term}</div><div class="meta">${rows.length?'Configured · data uploaded':'Configured · awaiting upload'}</div></div>`;host.appendChild(el);});}
-function renderKpiSettings(){const sel=$('settingsKpiTerminal');const available=TANGIER_TERMINALS.filter(t=>(CATALOG[t]||[]).length);if(!sel.dataset.bound){sel.onchange=renderKpiSettings;sel.dataset.bound='1';}const keep=available.includes(sel.value)?sel.value:(available[0]||'');sel.innerHTML=available.map(t=>`<option value="${t}">${t}</option>`).join('');sel.value=keep;const cat=CATALOG[keep]||[];$('kpiSettingsBody').innerHTML=cat.length?cat.map(k=>`<tr><td>${esc(k.key)}</td>${PERIODS.map(p=>`<td><span class="pp-badge ${((k.period_agg||{})[p]||'MAX').toLowerCase()}">${esc((k.period_agg||{})[p]||'–')}</span></td>`).join('')}<td>${esc(k.target_col||'–')}</td><td>${esc(k.weight_col||'–')}</td></tr>`).join(''):'<tr><td colspan="8" style="color:var(--text-muted)">Upload a terminal workbook to populate the KPI catalog.</td></tr>';}
-function renderPlannerRegistry(){const ids=Object.keys(PLANNER_REGISTRY).sort();$('plannerRegistryBody').innerHTML=ids.length?ids.map(id=>{const p=PLANNER_REGISTRY[id]||{};return `<tr><td>${esc(id)}</td><td><input id="plannerName_${esc(id)}" value="${esc(p.plannerName||'')}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 8px;min-width:200px"></td><td>${esc((p.terminals||[]).join(', '))}</td><td><button class="pp-btn" onclick="savePlannerName('${id.replace(/'/g,"\\'")}')">Save</button></td></tr>`}).join(''):'<tr><td colspan="4" style="color:var(--text-muted)">Planner IDs will appear after the first upload.</td></tr>';}
+function yearsForTerminal(term){return [...new Set((DATA[term]||[]).map(rowYear).filter(Boolean))].sort();}
+function sourceSettingValue(term,year,kpi,field){const rows=(DATA[term]||[]).filter(r=>rowYear(r)===String(year));const col=field==='target'?kpi.target_col:kpi.weight_col;if(!col)return null;const vals=rows.map(r=>num(r[col])).filter(v=>v!==null);return vals.length?Math.max(...vals):null;}
+function renderKpiSettings(){
+  const sel=$('settingsKpiTerminal'),yearSel=$('settingsKpiYear');
+  const available=TANGIER_TERMINALS.filter(t=>(CATALOG[t]||[]).length);
+  if(!sel.dataset.bound){sel.onchange=renderKpiSettings;sel.dataset.bound='1';}
+  if(!yearSel.dataset.bound){yearSel.onchange=renderKpiSettings;yearSel.dataset.bound='1';}
+  const keep=available.includes(sel.value)?sel.value:(available[0]||'');sel.innerHTML=available.map(t=>`<option value="${t}">${t}</option>`).join('');sel.value=keep;
+  const years=yearsForTerminal(keep);const keepYear=years.includes(yearSel.value)?yearSel.value:(years[years.length-1]||'');yearSel.innerHTML=years.slice().reverse().map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');yearSel.value=keepYear;
+  const cat=CATALOG[keep]||[],saved=(KPI_SETTINGS[keep]&&KPI_SETTINGS[keep][keepYear])||{};
+  $('kpiSettingsBody').innerHTML=cat.length?cat.map((k,i)=>{const ov=saved[k.key]||{},t=ov.target!==undefined?ov.target:sourceSettingValue(keep,keepYear,k,'target'),w=ov.weight!==undefined?ov.weight:sourceSettingValue(keep,keepYear,k,'weight');return `<tr><td>${esc(k.key)}</td>${PERIODS.map(p=>`<td><span class="pp-badge ${((k.period_agg||{})[p]||'MAX').toLowerCase()}">${esc((k.period_agg||{})[p]||'–')}</span></td>`).join('')}<td><input id="kpiTarget_${i}" value="${t===null?'':esc(t)}" style="width:90px;background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px"></td><td><input id="kpiWeight_${i}" value="${w===null?'':esc(w)}" style="width:80px;background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px"></td><td><button class="pp-btn" onclick="saveKpiSetting(${i})">Save</button></td></tr>`}).join(''):'<tr><td colspan="9" style="color:var(--text-muted)">Upload a terminal workbook to populate KPI targets and aggregation.</td></tr>';
+}
+window.saveKpiSetting=async i=>{const term=$('settingsKpiTerminal').value,year=$('settingsKpiYear').value,k=(CATALOG[term]||[])[i];if(!k||!year)return;const target=num($(`kpiTarget_${i}`).value),weight=num($(`kpiWeight_${i}`).value);KPI_SETTINGS[term]=KPI_SETTINGS[term]||{};KPI_SETTINGS[term][year]=KPI_SETTINGS[term][year]||{};KPI_SETTINGS[term][year][k.key]={target,weight};await db.collection('peopleKpiSettings').doc(`${term}__${year}`).set({terminal:term,year:String(year),settings:KPI_SETTINGS[term][year],updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});$('sidebarStatus').textContent='KPI target saved';renderKpiSettings();};
+function renderPlannerRegistry(){const ids=Object.keys(PLANNER_REGISTRY).sort();$('plannerRegistryBody').innerHTML=ids.length?ids.map(id=>{const p=PLANNER_REGISTRY[id]||{};return `<tr><td>${esc(id)}</td><td><input id="plannerName_${esc(id)}" value="${esc(p.plannerName||'')}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 8px;min-width:240px"></td><td><button class="pp-btn" onclick="savePlannerName('${id.replace(/'/g,"\\'")}')">Save</button></td></tr>`}).join(''):'<tr><td colspan="3" style="color:var(--text-muted)">Planner IDs will appear after the first upload.</td></tr>';}
+
 window.savePlannerName=async id=>{const input=document.getElementById('plannerName_'+id);await db.collection('peoplePlannerRegistry').doc(id).set({plannerId:id,plannerName:input.value.trim(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});PLANNER_REGISTRY[id]={...(PLANNER_REGISTRY[id]||{}),plannerName:input.value.trim()};$('sidebarStatus').textContent='Planner saved';};
 async function renderRoles(){const snap=await db.collection('peopleUsers').get();const rows=[];snap.forEach(d=>rows.push({uid:d.id,...d.data()}));$('rolesBody').innerHTML=rows.length?rows.map(u=>`<tr><td>${esc(u.email||'')}</td><td style="font:10px var(--mono)">${esc(u.uid)}</td><td><select id="role_${u.uid}" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px" onchange="saveRole('${u.uid}',this.value)">${['management','supervisor','planner','viewer'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}</select></td><td>${u.updatedAt&&u.updatedAt.toDate?u.updatedAt.toDate().toLocaleString():'–'}</td></tr>`).join(''):'<tr><td colspan="4">No users registered.</td></tr>';}
 window.saveRole=async(uid,role)=>{if(CURRENT_ROLE!=='management'){alert('Only management can change roles.');renderRoles();return;}await db.collection('peopleUsers').doc(uid).set({role,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});$('sidebarStatus').textContent='Role updated';};
