@@ -474,6 +474,17 @@ body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjus
 }
 </style>
 
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  if(window.Chart){
+    Chart.defaults.font.family="'Inter', sans-serif";
+    Chart.defaults.font.size=11;
+    Chart.defaults.color=getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#7E9AA8';
+  }
+});
+</script>
+
 </head>
 <body>
 <div class="bg-grid"></div>
@@ -1000,7 +1011,7 @@ function ppLineValueLabelPlugin(kpi, options={}){
         const meta=chart.getDatasetMeta(di);
         if(meta.hidden)return;
         ctx.save();
-        ctx.font='600 9px IBM Plex Mono';
+        ctx.font="600 10px 'IBM Plex Mono', monospace";
         ctx.textAlign='center';
         ctx.textBaseline='bottom';
         ctx.fillStyle='#FFFFFF';
@@ -1033,9 +1044,9 @@ function renderCharts(scoreKpi,curRows,score,scoreTarget){
     plugins:[{id:'centerText',afterDraw(ch){
       const {ctx,chartArea:{left,right,bottom}}=ch;
       ctx.save();
-      ctx.fillStyle=scoreColor;ctx.font='700 25px Space Grotesk';ctx.textAlign='center';
+      ctx.fillStyle=scoreColor;ctx.font="700 25px 'Space Grotesk', sans-serif";ctx.textAlign='center';
       ctx.fillText(fmt(score,false,2),(left+right)/2,bottom-28);
-      ctx.fillStyle=c.text;ctx.font='10px IBM Plex Mono';
+      ctx.fillStyle=c.text;ctx.font="10px 'IBM Plex Mono', monospace";
       ctx.fillText(`target ${fmt(scoreTarget,false,2)}`,(left+right)/2,bottom-8);
       ctx.restore();
     }}]
@@ -1062,8 +1073,8 @@ function renderCharts(scoreKpi,curRows,score,scoreTarget){
     type:'line',data:{labels:keys,datasets},
     plugins:[ppLineValueLabelPlugin(scoreKpi||{key:'Planner Score',isPercent:false})],
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
-      plugins:{legend:{display:scoreTarget!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},
-      scales:{x:{ticks:{color:'#FFFFFF',maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{size:10}},grid:{color:c.grid}},y:{ticks:{color:'#FFFFFF',font:{size:10}},grid:{color:c.grid}}}}
+      plugins:{legend:{display:scoreTarget!==null,labels:{color:c.text,boxWidth:10,font:{family:'Inter',size:10,weight:'500'}}}},
+      scales:{x:{ticks:{color:'#FFFFFF',maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{family:'Inter',size:10,weight:'500'}},grid:{color:c.grid}},y:{ticks:{color:'#FFFFFF',font:{family:'Inter',size:10,weight:'500'}},grid:{color:c.grid}}}}
   });
 }
 function getKpiValueForPeriod(kpi,rows,type,keyOverride){
@@ -1144,12 +1155,12 @@ function renderKpiTrends(kpis,selectedRows){
         plugins:{
           legend:{
             display:target!==null,
-            labels:{color:c.text,boxWidth:10,font:{size:9}}
+            labels:{color:c.text,boxWidth:10,font:{family:'Inter',size:10,weight:'500'}}
           }
         },
         scales:{
           x:{
-            ticks:{color:c.text,maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{size:10}},
+            ticks:{color:c.text,maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{family:'Inter',size:10,weight:'500'}},
             grid:{color:c.grid}
           },
           y:{
