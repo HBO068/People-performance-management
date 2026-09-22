@@ -451,6 +451,29 @@ body.pp-exporting *{-webkit-print-color-adjust:exact!important;print-color-adjus
 .pp-target-neutral{color:var(--text-faint)!important}
 </style>
 
+
+<style>
+.pp-kpi-trend-card canvas,
+.pp-trend canvas{
+  min-height:280px !important;
+}
+.pp-kpi-card .load-share-line{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+.pp-kpi-card .load-share-line .value{
+  margin-top:0 !important;
+}
+.pp-kpi-card .load-amount{
+  font:700 14px var(--display);
+  color:var(--text);
+  white-space:nowrap;
+}
+</style>
+
 </head>
 <body>
 <div class="bg-grid"></div>
@@ -754,7 +777,11 @@ function renderDashboardBody(){
   const dis=sum(filtered,'Total Discharge Planned');
   host.innerHTML=`<div class="pp-gauge-grid"><div class="pp-gauge"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score</div><canvas id="plannerGauge"></canvas></div><div class="pp-trend"><div class="label">${esc(PERIOD_LABEL[currentPeriodType])} Planner Score Trend</div><canvas id="plannerTrend"></canvas></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} Volume</div><div class="pp-volume-grid"><div class="pp-volume"><div class="label">Total Moves Planned</div><div class="value">${fmt(moves,false,0)}</div></div><div class="pp-volume"><div class="label">Load Planned</div><div class="value">${fmt(load,false,0)}</div></div><div class="pp-volume"><div class="label">Discharge Planned</div><div class="value">${fmt(dis,false,0)}</div></div><div class="pp-volume"><div class="label">Vessel Calls</div><div class="value">${calls}</div></div></div><div class="pp-section-label">${esc(PERIOD_LABEL[currentPeriodType])} KPI Scorecard</div><div class="pp-summary-grid" id="kpiCards"></div><div class="pp-section-label">KPI Trends</div><div class="pp-kpi-trend-grid" id="kpiTrendGrid"></div><div class="pp-section-label">Planner Vessel Detail</div><div class="pp-table-card"><table><thead><tr><th>Planner</th><th>Vessel Visit</th><th>Vessel Name</th><th>ETB</th><th>Total Moves</th><th>Planner Score</th></tr></thead><tbody>${filtered.slice().sort((a,b)=>String(a.ETB).localeCompare(String(b.ETB))).map(r=>`<tr><td>${esc(plannerName(norm(r.Planner)))}</td><td>${esc(r['Id visit'])}</td><td>${esc(r['Vessel Name'])}</td><td>${esc(shortDate(r.ETB))}</td><td>${fmt(num(r['Total Moves Planned '])??num(r['Total Moves Planned']),false,0)}</td><td>${fmt(r['Planner Score'],false,2)}</td></tr>`).join('')}</tbody></table></div>`;
   const cards=$('kpiCards');
-  catalog.filter(k=>normLow(k.key)!=='planner score').forEach(k=>{
+  const scorecardKpis=catalog
+    .filter(k=>normLow(k.key)!=='planner score')
+    .sort((a,b)=>(isLoadPlannedKpi(a)?-1:isLoadPlannedKpi(b)?1:0));
+
+  scorecardKpis.forEach(k=>{
     const value=getKpiValue(k,filtered);
     const target=targetFor(k,filtered);
     const weight=weightFor(k,filtered);
@@ -762,13 +789,24 @@ function renderDashboardBody(){
     const st=ppTargetStatus(k,value,target);
     const el=document.createElement('div');
     el.className='pp-kpi-card';
-    const targetLine=target!==null
-      ? `Target ${fmt(target,displayPct,2)}${weight!==null?` · Weight ${fmt(weight,true,1)}`:''}`
-      : (isLoadPlannedKpi(k)?'Share of terminal load in selected period':'Target –');
-    el.innerHTML=`<div class="label">${esc(k.key)}</div>
-      <div class="value ${st}">${fmt(value,displayPct,2)}</div>
-      <div class="target">${targetLine}</div>
-      ${target!==null?`<div class="target-status pp-target-${st}">${ppStatusLabel(st)}</div>`:''}`;
+
+    if(isLoadPlannedKpi(k)){
+      const plannerLoad=loadPlannedSum(filtered);
+      el.innerHTML=`<div class="label">${esc(k.key)}</div>
+        <div class="load-share-line">
+          <div class="value neutral">${fmt(value,true,2)}</div>
+          <div class="load-amount">${fmt(plannerLoad,false,0)} moves</div>
+        </div>
+        <div class="target">Share of terminal load in selected period</div>`;
+    }else{
+      const targetLine=target!==null
+        ? `Target ${fmt(target,displayPct,2)}${weight!==null?` · Weight ${fmt(weight,true,1)}`:''}`
+        : 'Target –';
+      el.innerHTML=`<div class="label">${esc(k.key)}</div>
+        <div class="value ${st}">${fmt(value,displayPct,2)}</div>
+        <div class="target">${targetLine}</div>
+        ${target!==null?`<div class="target-status pp-target-${st}">${ppStatusLabel(st)}</div>`:''}`;
+    }
     cards.appendChild(el);
   });
   renderCharts(scoreKpi,filtered,score,scoreTarget);
@@ -810,14 +848,21 @@ function ppLineValueLabelPlugin(kpi){
         const meta=chart.getDatasetMeta(di);
         if(meta.hidden)return;
         ctx.save();
-        ctx.font='600 9px IBM Plex Mono';
+        ctx.font='700 11px IBM Plex Mono';
         ctx.textAlign='center';
         ctx.textBaseline='bottom';
+        ctx.fillStyle='#FFFFFF';
+        ctx.strokeStyle='rgba(0,0,0,.82)';
+        ctx.lineWidth=3;
+        ctx.lineJoin='round';
         meta.data.forEach((pt,i)=>{
           const v=ds.data[i];
           if(v===null||v===undefined||!Number.isFinite(Number(v)))return;
-          ctx.fillStyle=(ds.pointBackgroundColor&&ds.pointBackgroundColor[i])||getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
-          ctx.fillText(ppChartLabel(kpi,v),pt.x,Math.max(chartArea.top+11,pt.y-6));
+          const txt=ppChartLabel(kpi,v);
+          const x=Math.max(chartArea.left+24,Math.min(chartArea.right-24,pt.x));
+          const y=Math.max(chartArea.top+18,pt.y-10);
+          ctx.strokeText(txt,x,y);
+          ctx.fillText(txt,x,y);
         });
         ctx.restore();
       });
@@ -861,7 +906,7 @@ function renderCharts(scoreKpi,curRows,score,scoreTarget){
     label:'Planner Score',data:vals,borderColor:pointColors[pointColors.length-1]||c.teal,
     segment:{borderColor:ctx=>pointColors[ctx.p1DataIndex]||c.teal},
     backgroundColor:(pointColors[pointColors.length-1]||c.teal)+'18',
-    fill:true,tension:.3,pointRadius:3,
+    fill:true,tension:.3,borderWidth:3,pointRadius:5,pointHoverRadius:7,
     pointBackgroundColor:pointColors,pointBorderColor:pointColors
   }];
   if(scoreTarget!==null)datasets.push({label:'Target',data:keys.map(()=>scoreTarget),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0,ppTargetLine:true});
@@ -870,7 +915,7 @@ function renderCharts(scoreKpi,curRows,score,scoreTarget){
     plugins:[ppLineValueLabelPlugin(scoreKpi||{key:'Planner Score',isPercent:false})],
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
       plugins:{legend:{display:scoreTarget!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},
-      scales:{x:{ticks:{color:c.text,maxTicksLimit:8},grid:{color:c.grid}},y:{ticks:{color:c.text},grid:{color:c.grid}}}}
+      scales:{x:{ticks:{color:'#FFFFFF',maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{size:10}},grid:{color:c.grid}},y:{ticks:{color:'#FFFFFF',font:{size:10}},grid:{color:c.grid}}}}
   });
 }
 function getKpiValueForPeriod(kpi,rows,type,keyOverride){
@@ -913,7 +958,7 @@ function renderKpiTrends(kpis,selectedRows){
       borderColor:pointColors[pointColors.length-1]||c.teal,
       segment:{borderColor:ctx=>pointColors[ctx.p1DataIndex]||c.teal},
       backgroundColor:(pointColors[pointColors.length-1]||c.teal)+'18',
-      fill:true,tension:.28,pointRadius:3,
+      fill:true,tension:.28,borderWidth:3,pointRadius:5,pointHoverRadius:7,
       pointBackgroundColor:pointColors,pointBorderColor:pointColors
     }];
     if(target!==null)datasets.push({label:'Target',data:keys.map(()=>target),borderColor:'#F5C518',borderDash:[5,4],pointRadius:0,fill:false,tension:0,ppTargetLine:true});
@@ -924,8 +969,8 @@ function renderKpiTrends(kpis,selectedRows){
       options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:18}},
         plugins:{legend:{display:target!==null,labels:{color:c.text,boxWidth:10,font:{size:9}}}},
         scales:{
-          x:{ticks:{color:c.text,maxTicksLimit:7},grid:{color:c.grid}},
-          y:{ticks:{color:c.text,callback:v=>displayPct?`${(Number(v)*100).toFixed(0)}%`:v},grid:{color:c.grid}}
+          x:{ticks:{color:'#FFFFFF',maxTicksLimit:6,autoSkip:true,maxRotation:0,minRotation:0,font:{size:10}},grid:{color:c.grid}},
+          y:{ticks:{color:'#FFFFFF',font:{size:10},callback:v=>displayPct?`${(Number(v)*100).toFixed(0)}%`:v},grid:{color:c.grid}}
         }
       }
     });
